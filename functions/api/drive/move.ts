@@ -47,7 +47,7 @@ async function getAccessToken(env: Env): Promise<string> {
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
     try {
-        const { fileId } = await context.request.json() as any;
+        const { fileId, newName } = await context.request.json() as any;
         const accessToken = await getAccessToken(context.env);
 
         // For Shared Drives, moving files or changing parents often faces the teamDrivesParentLimit constraint.
@@ -69,16 +69,22 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         // We supply both the new parent AND the target shared drive ID.
         let copyUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/copy?supportsAllDrives=true`;
 
+        const copyBody: any = {
+            parents: [DEST_FOLDER_ID],
+            ...(destinationDriveId ? { driveId: destinationDriveId } : {})
+        };
+
+        if (newName) {
+            copyBody.name = newName;
+        }
+
         const copyRes = await fetch(copyUrl, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                parents: [DEST_FOLDER_ID],
-                ...(destinationDriveId ? { driveId: destinationDriveId } : {})
-            })
+            body: JSON.stringify(copyBody)
         });
 
         if (!copyRes.ok) {

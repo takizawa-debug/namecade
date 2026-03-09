@@ -199,6 +199,10 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                     }
                     const extracted = parseData.data;
 
+                    if (file.folderName) {
+                        extracted.exchanger = file.folderName;
+                    }
+
                     updateLog(file.id, { status: 'saving', result: extracted });
 
                     const customerData = {
@@ -212,11 +216,17 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                     });
                     if (!saveRes.ok) throw new Error("データベースへの保存に失敗しました");
 
+                    const safeName = (extracted.name || '名前不明').replace(/[\/\\?%*:|"<>]/g, '');
+                    const safeCompany = (extracted.company || '会社不明').replace(/[\/\\?%*:|"<>]/g, '');
+                    const safeExchanger = (extracted.exchanger || '交換者不明').replace(/[\/\\?%*:|"<>]/g, '');
+                    const ext = file.fileName.split('.').pop() || 'pdf';
+                    const newFileName = `${safeExchanger}_${safeName}_${safeCompany}.${ext}`;
+
                     // Move file in Google Drive
                     const moveRes = await fetch('/api/drive/move', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ fileId: file.id })
+                        body: JSON.stringify({ fileId: file.id, newName: newFileName })
                     });
 
                     if (!moveRes.ok) {

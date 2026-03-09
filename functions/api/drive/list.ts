@@ -50,23 +50,72 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     try {
         const accessToken = await getAccessToken(context.env);
 
-        const listQuery = new URLSearchParams({
-            q: `'${SOURCE_FOLDER_ID}' in parents and trashed=false`,
-            fields: 'files(id, name, mimeType)',
-            pageSize: '50',
+        // 1. Get all subfolders
+        const folderQuery = new URLSearchParams({
+            q: `'${SOURCE_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+            fields: 'files(id, name)',
             includeItemsFromAllDrives: 'true',
             supportsAllDrives: 'true',
             corpora: 'allDrives'
         });
 
-        const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?${listQuery.toString()}`, {
+        const folderRes = await fetch(`https://www.googleapis.com/drive/v3/files?${folderQuery.toString()}`, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
 
-        if (!listRes.ok) throw new Error(await listRes.text());
+        if (!folderRes.ok) throw new Error(await folderRes.text());
+        const folderData = await folderRes.json() as { files: any[] };
+        const folders = folderData.files || [];
 
-        const data = await listRes.json() as { files: any };
-        return Response.json({ success: true, files: data.files || [] });
+        let allFiles: any[] = [];
+
+        // 2. Fetch files from each subfolder
+        for (const folder of folders) {
+            const fileQuery = new URLSearchParams({
+                q: `'${folder.id}' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false`,
+                fields: 'files(id, name, mimeType)',
+                includeItemsFromAllDrives: 'true',
+                supportsAllDrives: 'true',
+                corpora: 'allDrives'
+            });
+
+            const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files?${fileQuery.toString()}`, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+
+            if (fileRes.ok) {
+                const fileData = await fileRes.json() as { files: any[] };
+                const filesInFolder = (fileData.files || []).map(f => ({
+                    ...f,
+                    folderName: folder.name
+                }));
+                allFiles = allFiles.concat(filesInFolder);
+            }
+        }
+
+        // 3. Also fetch files in the root folder just in case
+        const rootFileQuery = new URLSearchParams({
+            q: `'${SOURCE_FOLDER_ID}' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false`,
+            fields: 'files(id, name, mimeType)',
+            includeItemsFromAllDrives: 'true',
+            supportsAllDrives: 'true',
+            corpora: 'allDrives'
+        });
+
+        const rootFileRes = await fetch(`https://www.googleapis.com/drive/v3/files?${rootFileQuery.toString()}`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        if (rootFileRes.ok) {
+            const rootFileData = await rootFileRes.json() as { files: any[] };
+            const rootFiles = (rootFileData.files || []).map(f => ({
+                ...f,
+                folderName: ''
+            }));
+            allFiles = allFiles.concat(rootFiles);
+        }
+
+        return Response.json({ success: true, files: allFiles });
     } catch (e) {
         return Response.json({ success: false, error: String(e) }, { status: 500 });
     }
