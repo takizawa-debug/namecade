@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Maximize, Settings } from 'lucide-react';
+import { LayoutDashboard, Settings } from 'lucide-react';
 import './Sidebar.css';
 
 const Sidebar: React.FC = () => {
@@ -20,14 +20,6 @@ const Sidebar: React.FC = () => {
                 >
                     <LayoutDashboard size={20} />
                     <span>ダッシュボード</span>
-                </NavLink>
-
-                <NavLink
-                    to="/scanner"
-                    className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                >
-                    <Maximize size={20} />
-                    <span>名刺スキャン</span>
                 </NavLink>
             </nav>
 

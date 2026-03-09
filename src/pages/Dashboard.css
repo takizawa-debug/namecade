@@ -136,3 +136,40 @@
     background-color: #FEE2E2;
     color: var(--color-danger);
 }
+
+
+/* Sync Panel Styles */
+.sync-logs-container {
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.status-badge.pending {
+    background-color: #f1f5f9;
+    color: #475569;
+}
+
+.status-badge.completed {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

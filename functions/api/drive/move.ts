@@ -58,7 +58,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
         const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?${moveQuery.toString()}`, {
             method: 'PATCH',
-            headers: { 'Authorization': `Bearer ${accessToken}` }
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
         });
 
         if (!res.ok) throw new Error(await res.text());
