@@ -56,7 +56,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         const listQuery = new URLSearchParams({
             q: `'${SOURCE_FOLDER_ID}' in parents and trashed=false`,
             fields: 'files(id, name, mimeType)',
-            pageSize: '50'
+            pageSize: '50',
+            includeItemsFromAllDrives: 'true',
+            supportsAllDrives: 'true'
         });
 
         const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?${listQuery.toString()}`, {
@@ -107,7 +109,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             // 3. Move file to completed folder
             const moveQuery = new URLSearchParams({
                 addParents: DEST_FOLDER_ID,
-                removeParents: SOURCE_FOLDER_ID
+                removeParents: SOURCE_FOLDER_ID,
+                supportsAllDrives: 'true'
             });
 
             await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?${moveQuery.toString()}`, {

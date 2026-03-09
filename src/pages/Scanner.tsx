@@ -67,8 +67,9 @@ const Scanner: React.FC = () => {
                     throw new Error(error);
                 }
             } else {
+                const data = await res.json();
                 await fetchLibrary();
-                alert("Google Driveと同期しました。");
+                alert(`Google Driveと同期しました。\n新しい名刺を ${data.processed}件 読み込みました。`);
             }
         } catch (error) {
             console.error("Drive sync failed", error);
