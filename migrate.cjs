@@ -27,11 +27,13 @@ async function main() {
         const mimeType = file.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg';
         const base64Data = fs.readFileSync(filePath).toString('base64');
 
-        const promptText = `あなたはプロフェッショナルな名刺情報抽出・分析アシスタントです。提供された名刺画像（表裏両面が含まれている場合もあります）から、以下の情報を日本語を最優先して極めて高い精度で抽出し、指定されたJSON構造のみを出力してください。
+        const promptText = `あなたはプロフェッショナルな名刺情報抽出・分析アシスタントです。提供された名刺画像（表裏両面が含まれている場合もあります）から、以下の情報を日本語を最優先して「極めて高い精度で」抽出し、指定されたJSON構造のみを出力してください。
 
-抽出と同時に、取得した総合的な情報から、相手がどのような組織・業種に属しているか、どのような役立つ接点（ビジネスチャンスなど）が持てそうか等について「AI分析コメント（150文字程度）」を作成し、\`aiAnalysis\`フィールドに格納してください。裏面の情報も加味してください。WEBサイトのURLやQRコード等があればそれも抽出してください。
-
-また、会社名については、名刺上に「(株)」や「㈱」といった略称が記載されている場合でも、必ず「株式会社」という正式名称に変換して出力してください。同様に「(有)」「㈲」は「有限会社」に、「(財)」「㈶」は「財団法人」にするなど、正式名称（完全な表記）で統一してください。
+【最重要ルール】
+- 記載されていない情報は絶対に推測して埋めないでください。名刺に記載がない項目（SNSアカウントやURL等）は必ず「空文字("")」にしてください。存在しない情報を勝手に生成することは厳禁です。
+- 会社名については、名刺上に「(株)」「㈱」といった略称が記載されている場合でも、必ず「株式会社」という正式名称に変換して出力してください。同様に「(有)」「㈲」は「有限会社」に、「(財)」「㈶」は「財団法人」にするなど、徹底して正式名称（完全な表記）で統一・正規化してください。
+- 住所、部署、役職、電話番号などは細かく適切に分割してください。
+- 抽出と同時に、取得した情報から相手がどのような組織に属しているか、どのようなビジネスの接点が持てそうか等について「AI分析コメント（100文字程度）」を作成し、\`aiAnalysis\`フィールドに格納してください。
 
 構造:
 { 
@@ -48,23 +50,17 @@ async function main() {
   "city": "市区町村", 
   "address_line1": "番地", 
   "address_line2": "建物名や階層（ない場合は空文字）", 
-  "website": "WEBサイトURL", 
-  "sns_x": "X(Twitter)アカウントURLまたはID",
-  "sns_facebook": "FacebookアカウントURLまたはID",
-  "sns_instagram": "InstagramアカウントURLまたはID",
-  "sns_linkedin": "LinkedInアカウントURLまたはID",
+  "website": "WEBサイトURL（名刺に明記されている場合のみ）", 
+  "sns_x": "X(Twitter)アカウント（名刺に明記されている場合のみ）",
+  "sns_facebook": "Facebookアカウント（名刺に明記されている場合のみ）",
+  "sns_instagram": "Instagramアカウント（名刺に明記されている場合のみ）",
+  "sns_linkedin": "LinkedInアカウント（名刺に明記されている場合のみ）",
   "sns_other": "その他のSNS等のURL",
-  "gathered_links": "ウェブ検索で発見した公式HPやSNSなどの関連URLの箇条書き一覧（見つかった全てのURLを記録）",
+  "gathered_links": "",
   "aiAnalysis": "AI分析コメント" 
 }
 
-条件:
-- 日本語の氏名、会社名、住所などは正確に読み取ってください。
-- 住所、部署、役職、電話番号などは細かく適切に分割してください。
-- 名刺に直接書かれていなくても、企業の公式HPや本人のSNS（X, Facebook, Instagram, LinkedIn等）がないかウェブ検索を通じて調査し、見つかった場合はそのURLやアカウント情報を各snsフィールドに入れてください。
-- ウェブ検索等で発見したすべての公式HP、関連ニュース、SNSなどのリンクURLは、単なる分析用途だけでなくリストとして記録できるよう、'gathered_links' フィールドにハイフン(-)始まりの箇条書きで全件出力してください。
-- AI分析コメントには、検索して得たその企業の事業内容や最近の動向、本人の発信内容なども加味して、より詳細で精度の高い「役立つ接点やビジネスチャンスの提案」を記述してください。
-- JSONフォーマット以外（説明テキストや\`\`\`jsonなどのマークダウン）は一切出力しないでください。`;
+JSONフォーマット以外（説明テキストや\`\`\`jsonなどのマークダウン）は一切出力しないでください。`;
 
         const payload = {
             contents: [
@@ -90,7 +86,7 @@ async function main() {
 
         while (!success && retries < 4) {
             try {
-                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -113,11 +109,12 @@ async function main() {
                 const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
                 if (textOutput) {
-                    const cleanedText = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
+                    const jsonMatch = textOutput.match(/\{[\s\S]*\}/);
+                    const cleanedText = jsonMatch ? jsonMatch[0] : textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
                     const info = JSON.parse(cleanedText);
 
                     // Escape quotes
-                    const escape = (str) => (str || '').replace(/'/g, "''");
+                    const escape = (str) => String(str || '').replace(/'/g, "''");
 
                     const combinedAddress = [info.prefecture, info.city, info.address_line1, info.address_line2].filter(Boolean).join('');
 
@@ -145,7 +142,7 @@ async function main() {
             }
         }
 
-        if (count >= 10) break;
+        if (count >= 5) break;
 
         // sleep to respect rate limits
         await sleep(2000);
