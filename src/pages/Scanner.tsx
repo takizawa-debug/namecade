@@ -48,7 +48,7 @@ const Scanner: React.FC = () => {
                 contents: [
                     {
                         parts: [
-                            { text: "Extract the following details from this business card and return ONLY a valid JSON object matching this structure: { \"name\": \"\", \"company\": \"\", \"role\": \"\", \"email\": \"\", \"phone\": \"\", \"address\": \"\" }. If a field is not found, leave it as an empty string. DO NOT use markdown formatting like ```json in the output." },
+                            { text: "Extract the following details from this business card and return ONLY a valid JSON object matching this structure: { \"name\": \"\", \"company\": \"\", \"role\": \"\", \"email\": \"\", \"phone\": \"\", \"address\": \"\" }. For Japanese cards, properly extract Japanese text. If a field is not found, leave it as an empty string. DO NOT use markdown formatting like ```json in the output." },
                             {
                                 inline_data: {
                                     mime_type: file.type,
@@ -63,7 +63,7 @@ const Scanner: React.FC = () => {
                 }
             };
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -103,28 +103,28 @@ const Scanner: React.FC = () => {
         <div className="scanner-page animate-fade-in">
             <header className="page-header">
                 <div>
-                    <h2>Scan Business Card</h2>
-                    <p className="subtitle">Upload a photo to automatically extract details using AI</p>
+                    <h2>名刺をスキャン</h2>
+                    <p className="subtitle">写真をアップロードして、AIで自動的に詳細を抽出します</p>
                 </div>
             </header>
 
             <div className="scanner-layout">
                 <div className="card upload-section">
-                    <h3>Card Image</h3>
+                    <h3>名刺画像</h3>
 
                     <div className={`upload-zone ${selectedImage ? 'has-image' : ''}`}>
                         {selectedImage ? (
                             <div className="image-preview">
                                 <img src={selectedImage} alt="Business Card Preview" />
                                 <button className="btn-secondary retake-btn" onClick={() => setSelectedImage(null)}>
-                                    <RefreshCw size={16} /> Retake
+                                    <RefreshCw size={16} /> 撮り直す
                                 </button>
                             </div>
                         ) : (
                             <label className="upload-label">
                                 <UploadCloud size={48} className="upload-icon" />
-                                <span className="upload-text">Drag & drop or click to upload</span>
-                                <span className="upload-hint">Supports JPG, PNG (Max 5MB)</span>
+                                <span className="upload-text">ドラッグ＆ドロップ、またはクリックしてアップロード</span>
+                                <span className="upload-hint">対応形式: JPG, PNG (最大5MB)</span>
                                 <input type="file" accept="image/*" onChange={handleImageUpload} hidden />
                             </label>
                         )}
@@ -132,18 +132,18 @@ const Scanner: React.FC = () => {
                 </div>
 
                 <div className="card result-section">
-                    <h3>Extracted Information</h3>
+                    <h3>抽出情報</h3>
 
                     {!selectedImage && !isScanning && (
                         <div className="empty-state">
-                            <p>Upload a business card to see extracted details here.</p>
+                            <p>名刺をアップロードすると、ここに抽出された詳細が表示されます。</p>
                         </div>
                     )}
 
                     {isScanning && (
                         <div className="scanning-state">
                             <div className="scan-loader"></div>
-                            <p>Extracting details with AI...</p>
+                            <p>AIで情報を抽出中...</p>
                         </div>
                     )}
 
@@ -151,45 +151,45 @@ const Scanner: React.FC = () => {
                         <div className="extracted-data animate-fade-in">
                             <div className="success-banner">
                                 <CheckCircle size={20} className="icon-success" />
-                                <span>Successfully extracted information. Please review and adjust.</span>
+                                <span>情報の抽出に成功しました。内容を確認して適宜修正してください。</span>
                             </div>
 
                             <div className="form-grid">
                                 <div className="input-group">
-                                    <span className="input-label">Full Name</span>
+                                    <span className="input-label">氏名</span>
                                     <input type="text" className="input-field" defaultValue={scanResult.name} />
                                 </div>
                                 <div className="input-group">
-                                    <span className="input-label">Company</span>
+                                    <span className="input-label">会社名</span>
                                     <input type="text" className="input-field" defaultValue={scanResult.company} />
                                 </div>
                                 <div className="input-group">
-                                    <span className="input-label">Role / Title</span>
+                                    <span className="input-label">役職</span>
                                     <input type="text" className="input-field" defaultValue={scanResult.role} />
                                 </div>
                                 <div className="input-group">
-                                    <span className="input-label">Email</span>
+                                    <span className="input-label">メールアドレス</span>
                                     <input type="email" className="input-field" defaultValue={scanResult.email} />
                                 </div>
                                 <div className="input-group">
-                                    <span className="input-label">Phone</span>
+                                    <span className="input-label">電話番号</span>
                                     <input type="tel" className="input-field" defaultValue={scanResult.phone} />
                                 </div>
                                 <div className="input-group">
-                                    <span className="input-label">Business Segment</span>
+                                    <span className="input-label">事業セグメント</span>
                                     <select className="input-field">
-                                        <option value="">Select segment...</option>
-                                        <option value="enterprise">Enterprise</option>
-                                        <option value="smb">SMB</option>
-                                        <option value="agency">Agency</option>
+                                        <option value="">セグメントを選択...</option>
+                                        <option value="大企業">大企業</option>
+                                        <option value="中小企業">中小企業</option>
+                                        <option value="代理店">代理店</option>
                                     </select>
                                 </div>
                             </div>
 
                             <div className="action-row">
-                                <button className="btn-secondary" onClick={() => setSelectedImage(null)}>Cancel</button>
+                                <button className="btn-secondary" onClick={() => setSelectedImage(null)}>キャンセル</button>
                                 <button className="btn-primary" onClick={handleSave}>
-                                    <Save size={18} /> Save Contact
+                                    <Save size={18} /> 連絡先を保存
                                 </button>
                             </div>
                         </div>

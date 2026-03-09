@@ -19,7 +19,7 @@ const Sidebar: React.FC = () => {
                     className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                 >
                     <LayoutDashboard size={20} />
-                    <span>Dashboard</span>
+                    <span>ダッシュボード</span>
                 </NavLink>
 
                 <NavLink
@@ -27,14 +27,14 @@ const Sidebar: React.FC = () => {
                     className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                 >
                     <Maximize size={20} />
-                    <span>Scan Card</span>
+                    <span>名刺スキャン</span>
                 </NavLink>
             </nav>
 
             <div className="sidebar-footer">
                 <button className="nav-item">
                     <Settings size={20} />
-                    <span>Settings</span>
+                    <span>設定</span>
                 </button>
             </div>
         </aside>

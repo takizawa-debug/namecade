@@ -1,55 +1,80 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Edit2, Save, MapPin, Phone, Mail, Building, Briefcase, Calendar } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './CustomerDetail.css';
 
 const MOCK_CUSTOMER = {
-    id: 1,
-    name: 'Taro Yamada',
-    company: 'Tech Corp',
-    role: 'CTO',
-    email: 'taro@example.com',
-    phone: '090-9876-5432',
-    address: '1-1-1 Marunouchi, Chiyoda-ku, Tokyo',
-    segment: 'Enterprise',
-    addedAt: '2026-03-01',
-    memo: 'Met at the Q1 tech conference. Very interested in our AI solutions. Follow up next month.'
+    id: 0,
+    name: '',
+    company: '',
+    role: '',
+    email: '',
+    phone: '',
+    address: '',
+    segment: '',
+    addedAt: new Date().toISOString(),
+    memo: ''
 };
 
 const CustomerDetail = () => {
-    useParams();
+    const { id } = useParams();
     const navigate = useNavigate();
     const [isEditing, setIsEditing] = useState(false);
-    const [customer, setCustomer] = useState(MOCK_CUSTOMER);
+    const [customer, setCustomer] = useState<any>(MOCK_CUSTOMER);
+    const [loading, setLoading] = useState(true);
 
-    const handleSave = () => {
-        setIsEditing(false);
-        // Add real API save logic here later
+    useEffect(() => {
+        if (!id) return;
+        fetch(`/api/customers/${id}`)
+            .then(res => res.json())
+            .then(data => {
+                setCustomer(data);
+                setLoading(false);
+            })
+            .catch(err => {
+                console.error('Failed to load detail', err);
+                setLoading(false);
+            });
+    }, [id]);
+
+    const handleSave = async () => {
+        try {
+            await fetch(`/api/customers/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(customer)
+            });
+            setIsEditing(false);
+        } catch (e) {
+            console.error('Save failed', e);
+        }
     };
 
     const handleBack = () => {
         navigate('/dashboard');
     };
 
+    if (loading) return <div className="customer-detail-page text-center"><p>読み込み中...</p></div>;
+
     return (
         <div className="customer-detail-page animate-fade-in">
             <header className="page-header sticky-header">
                 <div className="header-actions">
                     <button className="btn-secondary btn-icon" onClick={handleBack}>
-                        <ArrowLeft size={18} /> Back
+                        <ArrowLeft size={18} /> 戻る
                     </button>
                     <div className="header-titles">
-                        <h2>Customer Details</h2>
+                        <h2>顧客詳細</h2>
                     </div>
                 </div>
                 <div>
                     {isEditing ? (
                         <button className="btn-primary" onClick={handleSave}>
-                            <Save size={18} /> Save Changes
+                            <Save size={18} /> 変更を保存
                         </button>
                     ) : (
                         <button className="btn-secondary" onClick={() => setIsEditing(true)}>
-                            <Edit2 size={18} /> Edit Info
+                            <Edit2 size={18} /> 情報を編集
                         </button>
                     )}
                 </div>
@@ -79,20 +104,20 @@ const CustomerDetail = () => {
 
                     <div className="profile-quick-actions">
                         <a href={`mailto:${customer.email}`} className="action-btn">
-                            <Mail size={16} /> Email
+                            <Mail size={16} /> メール
                         </a>
                         <a href={`tel:${customer.phone}`} className="action-btn">
-                            <Phone size={16} /> Call
+                            <Phone size={16} /> 電話
                         </a>
                     </div>
                 </div>
 
                 <div className="profile-content">
                     <div className="card info-section">
-                        <h4 className="section-title">Contact Information</h4>
+                        <h4 className="section-title">連絡先情報</h4>
                         <div className="info-grid">
                             <div className="info-item">
-                                <span className="info-label"><Building size={16} /> Company</span>
+                                <span className="info-label"><Building size={16} /> 会社名</span>
                                 {isEditing ? (
                                     <input type="text" className="input-field" value={customer.company} onChange={e => setCustomer({ ...customer, company: e.target.value })} />
                                 ) : (
@@ -100,7 +125,7 @@ const CustomerDetail = () => {
                                 )}
                             </div>
                             <div className="info-item">
-                                <span className="info-label"><Briefcase size={16} /> Role</span>
+                                <span className="info-label"><Briefcase size={16} /> 役職</span>
                                 {isEditing ? (
                                     <input type="text" className="input-field" value={customer.role} onChange={e => setCustomer({ ...customer, role: e.target.value })} />
                                 ) : (
@@ -108,7 +133,7 @@ const CustomerDetail = () => {
                                 )}
                             </div>
                             <div className="info-item">
-                                <span className="info-label"><Mail size={16} /> Email</span>
+                                <span className="info-label"><Mail size={16} /> メールアドレス</span>
                                 {isEditing ? (
                                     <input type="email" className="input-field" value={customer.email} onChange={e => setCustomer({ ...customer, email: e.target.value })} />
                                 ) : (
@@ -116,7 +141,7 @@ const CustomerDetail = () => {
                                 )}
                             </div>
                             <div className="info-item">
-                                <span className="info-label"><Phone size={16} /> Phone</span>
+                                <span className="info-label"><Phone size={16} /> 電話番号</span>
                                 {isEditing ? (
                                     <input type="tel" className="input-field" value={customer.phone} onChange={e => setCustomer({ ...customer, phone: e.target.value })} />
                                 ) : (
@@ -124,7 +149,7 @@ const CustomerDetail = () => {
                                 )}
                             </div>
                             <div className="info-item full-width">
-                                <span className="info-label"><MapPin size={16} /> Address</span>
+                                <span className="info-label"><MapPin size={16} /> 住所</span>
                                 {isEditing ? (
                                     <input type="text" className="input-field" value={customer.address} onChange={e => setCustomer({ ...customer, address: e.target.value })} />
                                 ) : (
@@ -135,16 +160,16 @@ const CustomerDetail = () => {
                     </div>
 
                     <div className="card info-section">
-                        <h4 className="section-title">Additional Details</h4>
+                        <h4 className="section-title">追加情報</h4>
 
                         <div className="info-grid single-col">
                             <div className="info-item">
-                                <span className="info-label">Business Segment</span>
+                                <span className="info-label">事業セグメント</span>
                                 {isEditing ? (
                                     <select className="input-field" value={customer.segment} onChange={e => setCustomer({ ...customer, segment: e.target.value })}>
-                                        <option value="Enterprise">Enterprise</option>
-                                        <option value="SMB">SMB</option>
-                                        <option value="Agency">Agency</option>
+                                        <option value="大企業">大企業</option>
+                                        <option value="中小企業">中小企業</option>
+                                        <option value="代理店">代理店</option>
                                     </select>
                                 ) : (
                                     <span className="info-value">{customer.segment}</span>
@@ -152,7 +177,7 @@ const CustomerDetail = () => {
                             </div>
 
                             <div className="info-item">
-                                <span className="info-label">Notes & Memos</span>
+                                <span className="info-label">メモ・特記事項</span>
                                 {isEditing ? (
                                     <textarea
                                         className="input-field"
@@ -166,7 +191,7 @@ const CustomerDetail = () => {
                             </div>
 
                             <div className="info-item">
-                                <span className="info-label"><Calendar size={16} /> Date Added</span>
+                                <span className="info-label"><Calendar size={16} /> 登録日</span>
                                 <span className="info-value text-muted">{new Date(customer.addedAt).toLocaleDateString()}</span>
                             </div>
                         </div>

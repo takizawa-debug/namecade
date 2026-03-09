@@ -3,13 +3,13 @@ compatibility_date = "2024-03-09"
 pages_build_output_dir = "dist"
 
 [vars]
-# Add non-sensitive environment variables here
+# Optional: frontend variables
 
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "namecade-db"
-# database_id = "..."
+[[d1_databases]]
+binding = "DB"
+database_name = "namecade-db"
+database_id = "0657e246-474f-4980-a73b-8955a01b04fb"
 
-# [[r2_buckets]]
-# binding = "BUCKET"
-# bucket_name = "namecade-bucket"
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "namecade-bucket"
