@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Edit, Trash, Cloud, Loader, CheckCircle, AlertCircle } from 'lucide-react';
+import { Search, Filter, Trash, Cloud, Loader, CheckCircle, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 
@@ -16,6 +16,7 @@ const Dashboard = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [customers, setCustomers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
     // Sync state
     const [syncing, setSyncing] = useState(false);
@@ -45,6 +46,24 @@ const Dashboard = () => {
                 console.error('Failed to fetch customers:', err);
                 setLoading(false);
             });
+    };
+
+    const handleDeleteSelected = async () => {
+        if (selectedIds.length === 0) return;
+        if (!window.confirm(`${selectedIds.length}件の連絡先を削除しますか？`)) return;
+
+        setLoading(true);
+        try {
+            for (const id of selectedIds) {
+                await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+            }
+            setSelectedIds([]);
+            fetchCustomers();
+        } catch (error) {
+            console.error("Delete failed", error);
+            alert("削除中にエラーが発生しました。");
+            setLoading(false);
+        }
     };
 
     const toBase64 = (blob: Blob): Promise<string> => {
@@ -252,7 +271,7 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
     );
 
     return (
-        <div className="dashboard-page animate-fade-in">
+        <div className="dashboard-page animate-fade-in" style={{ maxWidth: '100%', padding: '2.5rem' }}>
             <header className="page-header">
                 <div>
                     <h2>ダッシュボード</h2>
@@ -319,52 +338,112 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
+                {selectedIds.length > 0 && (
+                    <button className="btn-secondary" style={{ color: '#ef4444', borderColor: '#fee2e2', backgroundColor: '#fef2f2' }} onClick={handleDeleteSelected}>
+                        <Trash size={18} />
+                        {selectedIds.length}件を削除
+                    </button>
+                )}
                 <button className="btn-secondary">
                     <Filter size={18} />
                     フィルター
                 </button>
             </div>
 
-            <div className="card table-container">
-                <table className="data-table">
+            <div className="card table-container" style={{ overflowX: 'auto', paddingBottom: '1rem' }}>
+                <table className="data-table" style={{ minWidth: '1600px' }}>
                     <thead>
                         <tr>
-                            <th>連絡先名</th>
-                            <th>会社名 & 役職</th>
-                            <th>事業区分</th>
-                            <th>追加日</th>
-                            <th></th>
+                            <th style={{ width: '40px', paddingLeft: '1.5rem', position: 'sticky', left: 0, background: '#f8fafc', zIndex: 10 }}>
+                                <input
+                                    type="checkbox"
+                                    checked={filteredCustomers.length > 0 && selectedIds.length === filteredCustomers.length}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setSelectedIds(filteredCustomers.map(c => c.id));
+                                        } else {
+                                            setSelectedIds([]);
+                                        }
+                                    }}
+                                />
+                            </th>
+                            <th style={{ minWidth: '120px' }}>氏名</th>
+                            <th style={{ minWidth: '120px' }}>氏名(ローマ字)</th>
+                            <th style={{ minWidth: '180px' }}>会社名</th>
+                            <th style={{ minWidth: '150px' }}>部署</th>
+                            <th style={{ minWidth: '120px' }}>役職</th>
+                            <th style={{ minWidth: '180px' }}>メールアドレス</th>
+                            <th style={{ minWidth: '120px' }}>固定電話</th>
+                            <th style={{ minWidth: '120px' }}>携帯電話</th>
+                            <th style={{ minWidth: '120px' }}>FAX</th>
+                            <th style={{ minWidth: '250px' }}>住所</th>
+                            <th style={{ minWidth: '150px' }}>WEBサイト</th>
+                            <th style={{ minWidth: '150px' }}>SNS</th>
+                            <th style={{ minWidth: '100px' }}>追加日</th>
+                            <th style={{ position: 'sticky', right: 0, background: '#f8fafc', zIndex: 10, width: '40px' }}></th>
                         </tr>
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px' }}><Loader size={24} className="spin text-muted" style={{ margin: '0 auto' }} /></td></tr>
+                            <tr><td colSpan={15} style={{ textAlign: 'center', padding: '40px' }}><Loader size={24} className="spin text-muted" style={{ margin: '0 auto' }} /></td></tr>
                         ) : filteredCustomers.length === 0 ? (
-                            <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px' }}><span className="text-muted">データが見つかりません。</span></td></tr>
+                            <tr><td colSpan={15} style={{ textAlign: 'center', padding: '40px' }}><span className="text-muted">データが見つかりません。</span></td></tr>
                         ) : (
                             filteredCustomers.map((customer: any) => (
                                 <tr key={customer.id} onClick={() => navigate(`/customer/${customer.id}`)} className="clickable-row">
+                                    <td onClick={e => e.stopPropagation()} style={{ paddingLeft: '1.5rem', position: 'sticky', left: 0, background: 'inherit', zIndex: 5 }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.includes(customer.id)}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setSelectedIds([...selectedIds, customer.id]);
+                                                } else {
+                                                    setSelectedIds(selectedIds.filter(id => id !== customer.id));
+                                                }
+                                            }}
+                                        />
+                                    </td>
                                     <td>
-                                        <div className="contact-info">
-                                            <div>
-                                                <div className="font-medium">{customer.name || '不明'}</div>
-                                                <div className="text-small text-muted">{customer.email}</div>
-                                            </div>
+                                        <div className="font-medium">{customer.name || '-'}</div>
+                                    </td>
+                                    <td>{customer.name_romaji || '-'}</td>
+                                    <td>
+                                        <div className="font-medium">{customer.company || '-'}</div>
+                                    </td>
+                                    <td>{customer.department || '-'}</td>
+                                    <td>{customer.role || '-'}</td>
+                                    <td>{customer.email || '-'}</td>
+                                    <td>{customer.phone || '-'}</td>
+                                    <td>{customer.phone_mobile || '-'}</td>
+                                    <td>{customer.fax || '-'}</td>
+                                    <td>
+                                        <div className="text-small" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '250px' }} title={`${customer.postal_code || ''} ${customer.prefecture || ''}${customer.city || ''}${customer.address_line1 || ''} ${customer.address_line2 || ''}`}>
+                                            {customer.prefecture || customer.city ? `${customer.postal_code || ''} ${customer.prefecture || ''}${customer.city || ''}${customer.address_line1 || ''} ${customer.address_line2 || ''}` : '-'}
                                         </div>
                                     </td>
                                     <td>
-                                        <div className="font-medium">{customer.company}</div>
-                                        <div className="text-small text-muted">{customer.role}</div>
+                                        {customer.website ? <a href={customer.website} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#0ea5e9' }}>{customer.website}</a> : '-'}
                                     </td>
                                     <td>
-                                        <span className="badge">{customer.business_category || '未設定'}</span>
+                                        <div className="text-small" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
+                                            {[
+                                                customer.sns_x ? `X` : null,
+                                                customer.sns_facebook ? `FB` : null,
+                                                customer.sns_instagram ? `IG` : null,
+                                                customer.sns_linkedin ? `IN` : null,
+                                                customer.sns_other ? `Other` : null
+                                            ].filter(Boolean).join(', ') || '-'}
+                                        </div>
                                     </td>
                                     <td>{new Date(customer.addedAt || customer.added_at || Date.now()).toLocaleDateString()}</td>
-                                    <td>
-                                        <div className="row-actions" onClick={e => e.stopPropagation()}>
-                                            <button className="icon-btn"><Edit size={16} /></button>
-                                            <button className="icon-btn danger"><Trash size={16} /></button>
-                                        </div>
+                                    <td style={{ position: 'sticky', right: 0, background: 'inherit', zIndex: 5, paddingRight: '1rem' }} onClick={e => e.stopPropagation()}>
+                                        <button className="icon-btn danger" onClick={async () => {
+                                            if (window.confirm('この連絡先を削除しますか？')) {
+                                                await fetch(`/api/customers/${customer.id}`, { method: 'DELETE' });
+                                                fetchCustomers();
+                                            }
+                                        }}><Trash size={16} /></button>
                                     </td>
                                 </tr>
                             ))

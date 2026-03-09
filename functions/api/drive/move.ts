@@ -50,34 +50,32 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         const { fileId } = await context.request.json() as any;
         const accessToken = await getAccessToken(context.env);
 
-        const getRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=parents&supportsAllDrives=true`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
+        // For Shared Drives, moving files or changing parents often faces the teamDrivesParentLimit constraint.
+        // It is safer to make a copy in the new location and delete the old one.
 
-        let currentParents = SOURCE_FOLDER_ID;
-        if (getRes.ok) {
-            const data = await getRes.json() as any;
-            if (data.parents && data.parents.length > 0) {
-                currentParents = data.parents.join(',');
-            }
-        }
-
-        const moveQuery = new URLSearchParams({
-            addParents: DEST_FOLDER_ID,
-            removeParents: currentParents,
-            supportsAllDrives: 'true'
-        });
-
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?${moveQuery.toString()}`, {
-            method: 'PATCH',
+        // 1. Copy the file to the destination folder
+        const copyRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/copy?supportsAllDrives=true`, {
+            method: 'POST',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({})
+            body: JSON.stringify({
+                parents: [DEST_FOLDER_ID]
+            })
         });
 
-        if (!res.ok) throw new Error(await res.text());
+        if (!copyRes.ok) throw new Error(`Copy failed: ${await copyRes.text()}`);
+
+        // 2. Delete the original file
+        const deleteRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+
+        if (!deleteRes.ok) throw new Error(`Delete failed: ${await deleteRes.text()}`);
 
         return Response.json({ success: true });
     } catch (e) {
