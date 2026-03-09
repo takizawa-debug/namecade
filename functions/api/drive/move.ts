@@ -53,15 +53,31 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         // For Shared Drives, moving files or changing parents often faces the teamDrivesParentLimit constraint.
         // It is safer to make a copy in the new location and delete the old one.
 
+        // 0. Get the driveId for DEST_FOLDER_ID
+        const destFolderRes = await fetch(`https://www.googleapis.com/drive/v3/files/${DEST_FOLDER_ID}?fields=driveId&supportsAllDrives=true`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        let destinationDriveId = undefined;
+        if (destFolderRes.ok) {
+            const destFolderData = await destFolderRes.json() as any;
+            destinationDriveId = destFolderData.driveId;
+        }
+
         // 1. Copy the file to the destination folder
-        const copyRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/copy?supportsAllDrives=true`, {
+        // The API requires knowing WHICH shared drive we are copying to, otherwise it throws 'insufficient permissions'.
+        // We supply both the new parent AND the target shared drive ID.
+        let copyUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/copy?supportsAllDrives=true`;
+
+        const copyRes = await fetch(copyUrl, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                parents: [DEST_FOLDER_ID]
+                parents: [DEST_FOLDER_ID],
+                ...(destinationDriveId ? { driveId: destinationDriveId } : {})
             })
         });
 
