@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Trash, Cloud, Loader, CheckCircle, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import './Dashboard.css';
 
 interface SyncLog {
@@ -188,6 +189,10 @@ const Dashboard = () => {
                     const promptText = `あなたはプロフェッショナルな名刺情報抽出・分析アシスタントです。提供された名刺画像（表裏両面が含まれている場合もあります）から、以下の情報を日本語を最優先して極めて高い精度で抽出し、指定されたJSON構造のみを出力してください。
 
 抽出と同時に、取得した総合的な情報から、相手がどのような組織・業種に属しているか、どのような役立つ接点（ビジネスチャンスなど）が持てそうか等について「AI分析コメント（150文字程度）」を作成し、\`aiAnalysis\`フィールドに格納してください。裏面の情報も加味してください。WEBサイトのURLやQRコード等があればそれも抽出してください。
+
+【重要】自社情報について：
+自社は「株式会社みみずや (https://mimizuya.co.jp/)」です。
+AI分析コメントを作成する際は、必ずこの「みみずや」と、読み取った名刺の人物・企業がどのようなビジネスの接点・シナジーがありそうか、どのような営業アプローチが有効かを推測し、相手の業種と役職に合わせてコメントとして記述してください。
 
 【重要】会社名について：
 以下はこれまでに登録された会社名のリストです。
@@ -456,8 +461,8 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                 )}
             </div>
 
-            {showBulkEdit && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            {showBulkEdit && createPortal(
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}>
                     <div className="card animate-fade-in" style={{ width: '400px', padding: '24px' }}>
                         <h3 style={{ marginBottom: '16px' }}>選択した {selectedIds.length} 件を一括編集</h3>
                         <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>空白のままの項目は変更されません。</p>
@@ -480,7 +485,7 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                             <button className="btn-primary" onClick={handleBulkEditSubmit}>一括更新</button>
                         </div>
                     </div>
-                </div>
+                </div>, document.body
             )}
 
             <div className="card table-container" style={{ overflowX: 'auto', paddingBottom: '1rem' }}>
