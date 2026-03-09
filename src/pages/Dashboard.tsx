@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Trash, Cloud, Loader, CheckCircle, AlertCircle } from 'lucide-react';
+import { Search, Trash, Cloud, Loader, CheckCircle, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 
@@ -18,6 +18,11 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
+    // sorting, filtering, and bulk editing state
+    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+    const [filters, setFilters] = useState<Record<string, string>>({});
+    const [showBulkEdit, setShowBulkEdit] = useState(false);
+    const [bulkEditData, setBulkEditData] = useState({ business_category: '', tags: '', exchanger: '' });
     // Sync state
     const [syncing, setSyncing] = useState(false);
     const [showSyncPanel, setShowSyncPanel] = useState(false);
@@ -64,6 +69,47 @@ const Dashboard = () => {
             alert("削除中にエラーが発生しました。");
             setLoading(false);
         }
+    };
+
+    const handleBulkEditSubmit = async () => {
+        if (selectedIds.length === 0) return;
+        setLoading(true);
+        try {
+            const dataToUpdate: any = {};
+            if (bulkEditData.business_category.trim()) dataToUpdate.business_category = bulkEditData.business_category.trim();
+            if (bulkEditData.tags.trim()) dataToUpdate.tags = bulkEditData.tags.trim();
+            if (bulkEditData.exchanger.trim()) dataToUpdate.exchanger = bulkEditData.exchanger.trim();
+
+            if (Object.keys(dataToUpdate).length === 0) {
+                alert("編集する項目を入力してください。");
+                setLoading(false);
+                return;
+            }
+
+            const res = await fetch('/api/customers/bulk', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: selectedIds, data: dataToUpdate })
+            });
+
+            if (!res.ok) throw new Error("Bulk edit failed");
+            setShowBulkEdit(false);
+            setBulkEditData({ business_category: '', tags: '', exchanger: '' });
+            setSelectedIds([]);
+            fetchCustomers();
+        } catch (error) {
+            console.error("Bulk edit failed", error);
+            alert("一括編集に失敗しました。");
+            setLoading(false);
+        }
+    };
+
+    const handleSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
     };
 
     const toBase64 = (blob: Blob): Promise<string> => {
@@ -274,11 +320,60 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
         }
     };
 
-    const filteredCustomers = customers.filter(c =>
+    let resultCustomers = customers.filter(c =>
         (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (c.company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (c.email || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    Object.keys(filters).forEach(key => {
+        if (filters[key]) {
+            resultCustomers = resultCustomers.filter(c =>
+                (c[key] || '').toString().toLowerCase().includes(filters[key].toLowerCase())
+            );
+        }
+    });
+
+    if (sortConfig) {
+        resultCustomers.sort((a, b) => {
+            const valA = (a[sortConfig.key] || '').toString().toLowerCase();
+            const valB = (b[sortConfig.key] || '').toString().toLowerCase();
+            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+
+    const filteredCustomers = resultCustomers;
+
+    const COLUMNS = [
+        { key: 'name', label: '氏名', width: '120px' },
+        { key: 'name_romaji', label: '氏名(ローマ字)', width: '120px' },
+        { key: 'company', label: '会社名', width: '200px' },
+        { key: 'department', label: '部署', width: '150px' },
+        { key: 'role', label: '役職', width: '120px' },
+        { key: 'email', label: 'メールアドレス', width: '200px' },
+        { key: 'phone', label: '固定電話', width: '130px' },
+        { key: 'phone_mobile', label: '携帯電話', width: '130px' },
+        { key: 'fax', label: 'FAX', width: '130px' },
+        { key: 'postal_code', label: '郵便番号', width: '100px' },
+        { key: 'prefecture', label: '都道府県', width: '100px' },
+        { key: 'city', label: '市区町村', width: '120px' },
+        { key: 'address_line1', label: '番地', width: '150px' },
+        { key: 'address_line2', label: '建物名・階層', width: '150px' },
+        { key: 'website', label: 'WEBサイト', width: '180px' },
+        { key: 'sns_x', label: 'X(Twitter)', width: '120px' },
+        { key: 'sns_facebook', label: 'Facebook', width: '130px' },
+        { key: 'sns_instagram', label: 'Instagram', width: '130px' },
+        { key: 'sns_linkedin', label: 'LinkedIn', width: '130px' },
+        { key: 'sns_other', label: 'その他SNS', width: '150px' },
+        { key: 'business_category', label: '事業区分', width: '150px' },
+        { key: 'tags', label: 'タグ', width: '150px' },
+        { key: 'exchanger', label: '交換者', width: '120px' },
+        { key: 'memo', label: 'メモ', width: '250px' },
+        { key: 'ai_analysis', label: 'AI分析', width: '300px' },
+        { key: 'added_at', label: '追加日', width: '120px' }
+    ];
 
     return (
         <div className="dashboard-page animate-fade-in" style={{ maxWidth: '100%', padding: '2.5rem' }}>
@@ -349,22 +444,50 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                     />
                 </div>
                 {selectedIds.length > 0 && (
-                    <button className="btn-secondary" style={{ color: '#ef4444', borderColor: '#fee2e2', backgroundColor: '#fef2f2' }} onClick={handleDeleteSelected}>
-                        <Trash size={18} />
-                        {selectedIds.length}件を削除
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="btn-secondary" style={{ color: '#0ea5e9', borderColor: '#e0f2fe', backgroundColor: '#f0f9ff' }} onClick={() => setShowBulkEdit(true)}>
+                            一括編集
+                        </button>
+                        <button className="btn-secondary" style={{ color: '#ef4444', borderColor: '#fee2e2', backgroundColor: '#fef2f2' }} onClick={handleDeleteSelected}>
+                            <Trash size={18} />
+                            {selectedIds.length}件を削除
+                        </button>
+                    </div>
                 )}
-                <button className="btn-secondary">
-                    <Filter size={18} />
-                    フィルター
-                </button>
             </div>
 
+            {showBulkEdit && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                    <div className="card animate-fade-in" style={{ width: '400px', padding: '24px' }}>
+                        <h3 style={{ marginBottom: '16px' }}>選択した {selectedIds.length} 件を一括編集</h3>
+                        <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>空白のままの項目は変更されません。</p>
+
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' }}>事業区分</label>
+                            <input type="text" className="input-field" value={bulkEditData.business_category} onChange={e => setBulkEditData({ ...bulkEditData, business_category: e.target.value })} placeholder="変更後の事業区分" />
+                        </div>
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' }}>タグ</label>
+                            <input type="text" className="input-field" value={bulkEditData.tags} onChange={e => setBulkEditData({ ...bulkEditData, tags: e.target.value })} placeholder="変更後のタグ" />
+                        </div>
+                        <div style={{ marginBottom: '24px' }}>
+                            <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' }}>交換者</label>
+                            <input type="text" className="input-field" value={bulkEditData.exchanger} onChange={e => setBulkEditData({ ...bulkEditData, exchanger: e.target.value })} placeholder="変更後の交換者" />
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                            <button className="btn-secondary" onClick={() => setShowBulkEdit(false)}>キャンセル</button>
+                            <button className="btn-primary" onClick={handleBulkEditSubmit}>一括更新</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="card table-container" style={{ overflowX: 'auto', paddingBottom: '1rem' }}>
-                <table className="data-table" style={{ minWidth: '1600px' }}>
+                <table className="data-table" style={{ minWidth: '2500px' }}>
                     <thead>
                         <tr>
-                            <th style={{ width: '40px', paddingLeft: '1.5rem', position: 'sticky', left: 0, background: '#f8fafc', zIndex: 10 }}>
+                            <th style={{ width: '40px', paddingLeft: '1.5rem', position: 'sticky', left: 0, background: '#f8fafc', zIndex: 20 }}>
                                 <input
                                     type="checkbox"
                                     checked={filteredCustomers.length > 0 && selectedIds.length === filteredCustomers.length}
@@ -377,27 +500,31 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                                     }}
                                 />
                             </th>
-                            <th style={{ minWidth: '120px' }}>氏名</th>
-                            <th style={{ minWidth: '120px' }}>氏名(ローマ字)</th>
-                            <th style={{ minWidth: '180px' }}>会社名</th>
-                            <th style={{ minWidth: '150px' }}>部署</th>
-                            <th style={{ minWidth: '120px' }}>役職</th>
-                            <th style={{ minWidth: '180px' }}>メールアドレス</th>
-                            <th style={{ minWidth: '120px' }}>固定電話</th>
-                            <th style={{ minWidth: '120px' }}>携帯電話</th>
-                            <th style={{ minWidth: '120px' }}>FAX</th>
-                            <th style={{ minWidth: '250px' }}>住所</th>
-                            <th style={{ minWidth: '150px' }}>WEBサイト</th>
-                            <th style={{ minWidth: '150px' }}>SNS</th>
-                            <th style={{ minWidth: '100px' }}>追加日</th>
-                            <th style={{ position: 'sticky', right: 0, background: '#f8fafc', zIndex: 10, width: '40px' }}></th>
+                            {COLUMNS.map(col => (
+                                <th key={col.key} style={{ minWidth: col.width, zIndex: 10, verticalAlign: 'top', paddingTop: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', cursor: 'pointer' }} onClick={() => handleSort(col.key)}>
+                                        {col.label}
+                                        {sortConfig?.key === col.key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="絞り込み..."
+                                        value={filters[col.key] || ''}
+                                        onClick={e => e.stopPropagation()}
+                                        onChange={e => setFilters({ ...filters, [col.key]: e.target.value })}
+                                        className="input-field"
+                                        style={{ width: '100%', padding: '4px 6px', fontSize: '11px', height: 'auto', minHeight: '24px' }}
+                                    />
+                                </th>
+                            ))}
+                            <th style={{ position: 'sticky', right: 0, background: '#f8fafc', zIndex: 20, width: '40px' }}></th>
                         </tr>
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan={15} style={{ textAlign: 'center', padding: '40px' }}><Loader size={24} className="spin text-muted" style={{ margin: '0 auto' }} /></td></tr>
+                            <tr><td colSpan={COLUMNS.length + 2} style={{ textAlign: 'center', padding: '40px' }}><Loader size={24} className="spin text-muted" style={{ margin: '0 auto' }} /></td></tr>
                         ) : filteredCustomers.length === 0 ? (
-                            <tr><td colSpan={15} style={{ textAlign: 'center', padding: '40px' }}><span className="text-muted">データが見つかりません。</span></td></tr>
+                            <tr><td colSpan={COLUMNS.length + 2} style={{ textAlign: 'center', padding: '40px' }}><span className="text-muted">データが見つかりません。</span></td></tr>
                         ) : (
                             filteredCustomers.map((customer: any) => (
                                 <tr key={customer.id} onClick={() => navigate(`/customer/${customer.id}`)} className="clickable-row">
@@ -414,39 +541,23 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                                             }}
                                         />
                                     </td>
-                                    <td>
-                                        <div className="font-medium">{customer.name || '-'}</div>
-                                    </td>
-                                    <td>{customer.name_romaji || '-'}</td>
-                                    <td>
-                                        <div className="font-medium">{customer.company || '-'}</div>
-                                    </td>
-                                    <td>{customer.department || '-'}</td>
-                                    <td>{customer.role || '-'}</td>
-                                    <td>{customer.email || '-'}</td>
-                                    <td>{customer.phone || '-'}</td>
-                                    <td>{customer.phone_mobile || '-'}</td>
-                                    <td>{customer.fax || '-'}</td>
-                                    <td>
-                                        <div className="text-small" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '250px' }} title={`${customer.postal_code || ''} ${customer.prefecture || ''}${customer.city || ''}${customer.address_line1 || ''} ${customer.address_line2 || ''}`}>
-                                            {customer.prefecture || customer.city ? `${customer.postal_code || ''} ${customer.prefecture || ''}${customer.city || ''}${customer.address_line1 || ''} ${customer.address_line2 || ''}` : '-'}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        {customer.website ? <a href={customer.website} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#0ea5e9' }}>{customer.website}</a> : '-'}
-                                    </td>
-                                    <td>
-                                        <div className="text-small" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
-                                            {[
-                                                customer.sns_x ? `X` : null,
-                                                customer.sns_facebook ? `FB` : null,
-                                                customer.sns_instagram ? `IG` : null,
-                                                customer.sns_linkedin ? `IN` : null,
-                                                customer.sns_other ? `Other` : null
-                                            ].filter(Boolean).join(', ') || '-'}
-                                        </div>
-                                    </td>
-                                    <td>{new Date(customer.addedAt || customer.added_at || Date.now()).toLocaleDateString()}</td>
+                                    {COLUMNS.map(col => {
+                                        let val = customer[col.key] || '-';
+                                        if (col.key === 'added_at') {
+                                            val = new Date(customer.addedAt || customer.added_at || Date.now()).toLocaleDateString();
+                                        } else if (col.key === 'website' && customer.website) {
+                                            val = <a href={customer.website} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#0ea5e9' }}>{customer.website}</a>;
+                                        } else if (col.key === 'sns_x' && customer.sns_x) {
+                                            val = <a href={customer.sns_x.startsWith('http') ? customer.sns_x : `https://x.com/${customer.sns_x}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#0ea5e9' }}>{customer.sns_x}</a>;
+                                        }
+                                        return (
+                                            <td key={col.key}>
+                                                <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: col.width }} title={String(customer[col.key] || '')}>
+                                                    {val}
+                                                </div>
+                                            </td>
+                                        );
+                                    })}
                                     <td style={{ position: 'sticky', right: 0, background: 'inherit', zIndex: 5, paddingRight: '1rem' }} onClick={e => e.stopPropagation()}>
                                         <button className="icon-btn danger" onClick={async () => {
                                             if (window.confirm('この連絡先を削除しますか？')) {
