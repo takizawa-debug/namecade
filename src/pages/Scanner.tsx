@@ -4,8 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import CameraCapture from '../components/CameraCapture';
 import './Scanner.css';
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
 interface ScanItem {
     id: number;
     file_name: string;
@@ -111,10 +109,6 @@ const Scanner: React.FC = () => {
         setScanResult(null);
 
         try {
-            if (!GEMINI_API_KEY) {
-                throw new Error("GEMINI_API_KEY is missing. Please set it in .env.local.");
-            }
-
             // Fetch the image to get base64
             const imgRes = await fetch(scan.image_url);
             const blob = await imgRes.blob();
@@ -171,15 +165,10 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
             else if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
             else if (!mimeType || mimeType === 'application/octet-stream') mimeType = 'image/jpeg';
 
-            const payload = {
-                contents: [{ parts: [{ text: promptText }, { inline_data: { mime_type: mimeType, data: base64Data } }] }],
-                generationConfig: { temperature: 0.0 }
-            };
-
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            const response = await fetch(`/api/parse`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ prompt: promptText, base64Data, mimeType })
             });
 
             if (!response.ok) {
@@ -188,14 +177,10 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
             }
 
             const data = await response.json();
-            const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-            if (textOutput) {
-                const cleanedText = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
-                const extractedJson = JSON.parse(cleanedText);
-                setScanResult(extractedJson);
+            if (data.success) {
+                setScanResult(data.data);
             } else {
-                throw new Error("No data returned from AI.");
+                throw new Error(data.error || "No data returned from AI.");
             }
         } catch (error) {
             console.error("Scanning failed", error);
