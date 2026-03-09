@@ -46,7 +46,7 @@ const Dashboard = () => {
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
     const [filters, setFilters] = useState<Record<string, string>>({});
     const [showBulkEdit, setShowBulkEdit] = useState(false);
-    const [bulkEditData, setBulkEditData] = useState({ business_category: '', tags: '', exchanger: '' });
+    const [bulkEditData, setBulkEditData] = useState({ business_category: '', tags: '', exchanger: '', added_at: '' });
     // Sync state
     const [syncing, setSyncing] = useState(false);
     const [showSyncPanel, setShowSyncPanel] = useState(false);
@@ -103,6 +103,7 @@ const Dashboard = () => {
             if (bulkEditData.business_category.trim()) dataToUpdate.business_category = bulkEditData.business_category.trim();
             if (bulkEditData.tags.trim()) dataToUpdate.tags = bulkEditData.tags.trim();
             if (bulkEditData.exchanger.trim()) dataToUpdate.exchanger = bulkEditData.exchanger.trim();
+            if (bulkEditData.added_at.trim()) dataToUpdate.added_at = bulkEditData.added_at.trim();
 
             if (Object.keys(dataToUpdate).length === 0) {
                 alert("編集する項目を入力してください。");
@@ -118,7 +119,7 @@ const Dashboard = () => {
 
             if (!res.ok) throw new Error("Bulk edit failed");
             setShowBulkEdit(false);
-            setBulkEditData({ business_category: '', tags: '', exchanger: '' });
+            setBulkEditData({ business_category: '', tags: '', exchanger: '', added_at: '' });
             setSelectedIds([]);
             fetchCustomers();
         } catch (error) {
@@ -498,9 +499,13 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                             <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' }}>タグ</label>
                             <input type="text" className="input-field" value={bulkEditData.tags} onChange={e => setBulkEditData({ ...bulkEditData, tags: e.target.value })} placeholder="変更後のタグ" />
                         </div>
-                        <div style={{ marginBottom: '24px' }}>
+                        <div style={{ marginBottom: '12px' }}>
                             <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' }}>交換者</label>
                             <input type="text" className="input-field" value={bulkEditData.exchanger} onChange={e => setBulkEditData({ ...bulkEditData, exchanger: e.target.value })} placeholder="変更後の交換者" />
+                        </div>
+                        <div style={{ marginBottom: '24px' }}>
+                            <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' }}>追加日</label>
+                            <input type="date" className="input-field" value={bulkEditData.added_at} onChange={e => setBulkEditData({ ...bulkEditData, added_at: e.target.value })} />
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>

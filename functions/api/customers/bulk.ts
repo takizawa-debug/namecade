@@ -7,13 +7,14 @@ interface Env {
 export const onRequestPut: PagesFunction<Env> = async (context) => {
     try {
         const body = await context.request.json() as { ids: number[], data: any };
-        const { business_category, tags, exchanger } = body.data;
+        const { business_category, tags, exchanger, added_at } = body.data;
 
         let updates = [];
         let params = [];
         if (business_category !== undefined) { updates.push('business_category = ?'); params.push(business_category); }
         if (tags !== undefined) { updates.push('tags = ?'); params.push(tags); }
         if (exchanger !== undefined) { updates.push('exchanger = ?'); params.push(exchanger); }
+        if (added_at !== undefined) { updates.push('added_at = ?'); params.push(added_at); }
 
         if (updates.length > 0 && body.ids && body.ids.length > 0) {
             const placeholders = body.ids.map(() => '?').join(',');
