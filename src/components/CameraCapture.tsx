@@ -1,5 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
 import Webcam from 'react-webcam';
+import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
+import type { Crop, PixelCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 import { jsPDF } from 'jspdf';
 import { Camera, RefreshCw, CheckCircle, FilePlus, ArrowLeft, Save } from 'lucide-react';
 import './CameraCapture.css';
@@ -11,8 +14,59 @@ interface CameraCaptureProps {
 
 const CameraCapture: React.FC<CameraCaptureProps> = ({ onCaptureComplete, onCancel }) => {
     const webcamRef = useRef<Webcam>(null);
+    const imgRef = useRef<HTMLImageElement>(null);
     const [images, setImages] = useState<string[]>([]);
     const [currentCapture, setCurrentCapture] = useState<string | null>(null);
+    const [crop, setCrop] = useState<Crop>();
+    const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+
+    const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        const { width, height } = e.currentTarget;
+        // Default crop: center, 90% of width, somewhat a business card aspect ratio (e.g. 16:9 or 9:5)
+        const crop = centerCrop(
+            makeAspectCrop(
+                {
+                    unit: '%',
+                    width: 90,
+                },
+                1.6, // typical business card ratio ~91/55
+                width,
+                height
+            ),
+            width,
+            height
+        );
+        setCrop(crop);
+    };
+
+    const getCroppedImg = async (imageSrc: string, pixelCrop: PixelCrop): Promise<string> => {
+        const image = new Image();
+        image.src = imageSrc;
+        await new Promise(r => image.onload = r);
+
+        const canvas = document.createElement('canvas');
+        const scaleX = image.naturalWidth / image.width;
+        const scaleY = image.naturalHeight / image.height;
+
+        canvas.width = pixelCrop.width;
+        canvas.height = pixelCrop.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return imageSrc;
+
+        ctx.drawImage(
+            image,
+            pixelCrop.x * scaleX,
+            pixelCrop.y * scaleY,
+            pixelCrop.width * scaleX,
+            pixelCrop.height * scaleY,
+            0,
+            0,
+            pixelCrop.width,
+            pixelCrop.height
+        );
+
+        return canvas.toDataURL('image/jpeg', 0.9);
+    };
 
     const capture = useCallback(() => {
         const imageSrc = webcamRef.current?.getScreenshot();
@@ -23,25 +77,26 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCaptureComplete, onCanc
 
     const handleConfirmCrop = async () => {
         if (!currentCapture) return;
-        // In a real app we would crop, but for simplicity here if they didn't touch it much we just use the whole or the bounding box
-        // To properly use react-image-crop with pixel values, we need the HTMLImageElement reference.
-        // Let's do a simplified version: just accept the image as is or provide basic crop.
-        // For robustness, returning the original capture if crop fails
+
         let finalImage = currentCapture;
         try {
-            // simplified: we'll just save the original image or let them retake. 
-            // Implementing perfect canvas crop in React requires img ref. 
-            finalImage = currentCapture;
+            if (completedCrop && completedCrop.width > 0 && completedCrop.height > 0) {
+                finalImage = await getCroppedImg(currentCapture, completedCrop);
+            }
         } catch (e) {
-            console.error(e);
+            console.error('Failed to crop image', e);
         }
 
         setImages([...images, finalImage]);
         setCurrentCapture(null);
+        setCrop(undefined);
+        setCompletedCrop(undefined);
     };
 
     const retake = () => {
         setCurrentCapture(null);
+        setCrop(undefined);
+        setCompletedCrop(undefined);
     };
 
     const finishAndCreatePDF = async () => {
@@ -104,8 +159,22 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCaptureComplete, onCanc
                 </div>
             ) : (
                 <div className="crop-wrapper">
-                    <p className="subtitle text-center mt-2">この画像を使用しますか？</p>
-                    <img src={currentCapture} alt="captured" className="preview-image" />
+                    <p className="subtitle text-center mt-2">切り抜く範囲を調整して、名刺部分だけを囲んでください</p>
+                    <div className="react-crop-container mt-4 mb-4" style={{ display: 'flex', justifyContent: 'center' }}>
+                        <ReactCrop
+                            crop={crop}
+                            onChange={(c) => setCrop(c)}
+                            onComplete={(c) => setCompletedCrop(c)}
+                        >
+                            <img
+                                ref={imgRef}
+                                src={currentCapture}
+                                alt="captured"
+                                className="preview-image"
+                                onLoad={onImageLoad}
+                            />
+                        </ReactCrop>
+                    </div>
 
                     <div className="camera-controls">
                         <button className="btn-secondary" onClick={retake}>
