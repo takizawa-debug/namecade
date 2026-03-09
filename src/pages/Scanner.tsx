@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { UploadCloud, CheckCircle, Save, Camera, FileText, ArrowRight, Loader } from 'lucide-react';
+import { CheckCircle, Save, FileText, ArrowRight, Loader, Cloud } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import CameraCapture from '../components/CameraCapture';
 import './Scanner.css';
 
 interface ScanItem {
@@ -17,14 +16,14 @@ const Scanner: React.FC = () => {
     const navigate = useNavigate();
     const [scans, setScans] = useState<ScanItem[]>([]);
     const [loadingLibrary, setLoadingLibrary] = useState(true);
-    const [mode, setMode] = useState<'library' | 'camera' | 'parsing'>('library');
+    const [syncing, setSyncing] = useState(false);
+    const [mode, setMode] = useState<'library' | 'parsing'>('library');
 
     // Parsing state
     const [currentParseScan, setCurrentParseScan] = useState<ScanItem | null>(null);
     const [isScanning, setIsScanning] = useState(false);
     const [scanResult, setScanResult] = useState<any | null>(null);
     const [existingCompanies, setExistingCompanies] = useState<string[]>([]);
-    const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
         fetchLibrary();
@@ -54,51 +53,28 @@ const Scanner: React.FC = () => {
         }
     };
 
-    const handleBatchUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-        setUploading(true);
+    const handleDriveSync = async () => {
+        setSyncing(true);
         try {
-            for (let i = 0; i < files.length; i++) {
-                await uploadSingleFile(files[i]);
+            // Future implementation: call /api/sync-drive
+            const res = await fetch('/api/sync-drive', { method: 'POST' });
+            if (!res.ok) {
+                const error = await res.text();
+                // Check if it's 404 (not implemented yet)
+                if (res.status === 404) {
+                    alert("Google Driveの同期バックエンドがまだ設定されていません。");
+                } else {
+                    throw new Error(error);
+                }
+            } else {
+                await fetchLibrary();
+                alert("Google Driveと同期しました。");
             }
-            await fetchLibrary();
         } catch (error) {
-            console.error("Batch upload failed", error);
-            alert("複数ファイルのアップロード中にエラーが発生しました。");
+            console.error("Drive sync failed", error);
+            alert("同期中にエラーが発生しました。Google Cloudの設定を確認してください。");
         } finally {
-            setUploading(false);
-            e.target.value = ''; // reset
-        }
-    };
-
-    const uploadSingleFile = async (file: File) => {
-        const uploadRes = await fetch('/api/upload', {
-            method: 'POST',
-            body: file,
-            headers: { 'Content-Type': file.type }
-        });
-        if (uploadRes.ok) {
-            const { url, filename } = await uploadRes.json();
-            await fetch('/api/scans', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ file_name: filename, image_url: url, status: 'pending' })
-            });
-        }
-    };
-
-    const handleCameraCapture = async (file: File) => {
-        setUploading(true);
-        try {
-            await uploadSingleFile(file);
-            await fetchLibrary();
-            setMode('library');
-        } catch (error) {
-            console.error("Upload failed", error);
-            alert("アップロードに失敗しました。");
-        } finally {
-            setUploading(false);
+            setSyncing(false);
         }
     };
 
@@ -244,10 +220,6 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
         fetchLibrary();
     };
 
-
-    if (mode === 'camera') {
-        return <div className="scanner-page animate-fade-in"><CameraCapture onCaptureComplete={handleCameraCapture} onCancel={() => setMode('library')} /></div>;
-    }
 
     if (mode === 'parsing' && currentParseScan) {
         return (
@@ -403,14 +375,10 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                     <p className="subtitle">撮影・アップロードした名刺の一括管理</p>
                 </div>
                 <div style={{ display: 'flex', gap: '12px' }}>
-                    <button className="btn-secondary" onClick={() => setMode('camera')}>
-                        <Camera size={18} /> その場で撮影
+                    <button className="btn-primary" onClick={handleDriveSync} disabled={syncing} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {syncing ? <Loader size={18} className="spin" /> : <Cloud size={18} />}
+                        Googleドライブから同期
                     </button>
-                    <label className="btn-primary" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {uploading ? <Loader size={18} className="spin" /> : <UploadCloud size={18} />}
-                        一括アップロード (JPG/PDF)
-                        <input type="file" multiple accept="image/*,application/pdf" onChange={handleBatchUpload} hidden disabled={uploading} />
-                    </label>
                 </div>
             </header>
 
