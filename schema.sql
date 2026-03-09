@@ -22,7 +22,7 @@ CREATE TABLE customers (
   sns_instagram TEXT,
   sns_linkedin TEXT,
   sns_other TEXT,
-  gathered_links TEXT,
+  name_romaji TEXT,
   exchanger TEXT,
   business_category TEXT,
   tags TEXT,

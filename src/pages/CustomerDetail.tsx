@@ -84,17 +84,31 @@ const CustomerDetail = () => {
                 <div className="card profile-sidebar">
                     <div className="profile-main-info">
                         {isEditing ? (
-                            <input
-                                type="text"
-                                className="input-field text-center font-bold"
-                                value={customer.name}
-                                onChange={e => setCustomer({ ...customer, name: e.target.value })}
-                            />
+                            <>
+                                <input
+                                    type="text"
+                                    className="input-field text-center font-bold"
+                                    value={customer.name}
+                                    placeholder="氏名"
+                                    onChange={e => setCustomer({ ...customer, name: e.target.value })}
+                                />
+                                <input
+                                    type="text"
+                                    className="input-field text-center mt-2"
+                                    value={customer.name_romaji || ''}
+                                    placeholder="ローマ字表記"
+                                    onChange={e => setCustomer({ ...customer, name_romaji: e.target.value })}
+                                    style={{ marginTop: '8px' }}
+                                />
+                            </>
                         ) : (
-                            <h3>{customer.name}</h3>
+                            <>
+                                <h3>{customer.name}</h3>
+                                {customer.name_romaji && <p className="text-muted text-sm">{customer.name_romaji}</p>}
+                            </>
                         )}
 
-                        <p className="profile-subtitle">{customer.role} at {customer.company}</p>
+                        <p className="profile-subtitle" style={{ marginTop: '8px' }}>{customer.role} at {customer.company}</p>
                         <span className="badge mt-2">{customer.segment}</span>
                     </div>
 
@@ -365,21 +379,7 @@ const CustomerDetail = () => {
                                 )}
                             </div>
 
-                            <div className="info-item">
-                                <span className="info-label">ウェブ検索で収集したリンク</span>
-                                {isEditing ? (
-                                    <textarea
-                                        className="input-field"
-                                        rows={5}
-                                        value={customer.gathered_links || ''}
-                                        onChange={e => setCustomer({ ...customer, gathered_links: e.target.value })}
-                                    />
-                                ) : (
-                                    <div className="info-value memo-text" style={{ backgroundColor: 'var(--surface-color-subtle)', padding: '10px', borderRadius: '8px', whiteSpace: 'pre-wrap' }}>
-                                        {customer.gathered_links || '収集されたリンクはありません'}
-                                    </div>
-                                )}
-                            </div>
+
 
                             <div className="info-item">
                                 <span className="info-label"><Calendar size={16} /> 登録日</span>

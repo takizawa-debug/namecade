@@ -22,7 +22,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
             name, company, role, department,
             email, phone, phone_mobile, fax,
             address, postal_code, prefecture, city, address_line1, address_line2,
-            website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
+            website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, name_romaji,
             exchanger, business_category, tags, memo, ai_analysis
         } = data;
 
@@ -31,7 +31,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
                 name=?, company=?, role=?, department=?,
                 email=?, phone=?, phone_mobile=?, fax=?,
                 address=?, postal_code=?, prefecture=?, city=?, address_line1=?, address_line2=?,
-                website=?, sns_x=?, sns_facebook=?, sns_instagram=?, sns_linkedin=?, sns_other=?, gathered_links=?,
+                website=?, sns_x=?, sns_facebook=?, sns_instagram=?, sns_linkedin=?, sns_other=?, name_romaji=?,
                 exchanger=?, business_category=?, tags=?, memo=?, ai_analysis=?
             WHERE id=?`
         ).bind(
@@ -55,7 +55,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
             sns_instagram || '',
             sns_linkedin || '',
             sns_other || '',
-            gathered_links || '',
+            name_romaji || '',
             exchanger || '',
             business_category || '',
             tags || '',

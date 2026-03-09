@@ -9,7 +9,7 @@ const Sidebar: React.FC = () => {
             <div className="sidebar-header">
                 <h1 className="sidebar-brand">
                     <span className="brand-icon"></span>
-                    NameCade
+                    NameCard
                 </h1>
             </div>
 

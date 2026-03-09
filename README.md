@@ -1,4 +1,4 @@
-# NameCade - Name Card & Customer Management
+# NameCard - Name Card & Customer Management
 
 A modern, fast, and secure business card management web application for internal company use. 
 Powered by React, Vite, and Cloudflare Pages/D1/R2, with Gemini AI for automated card OCR.

@@ -72,6 +72,7 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
 構造:
 { 
   "name": "氏名", 
+  "name_romaji": "氏名のローマ字読み（名刺に明記されている場合のみ。ない場合は空文字）",
   "company": "会社名", 
   "department": "部署（ない場合は空文字）", 
   "role": "役職（ない場合は空文字）", 
@@ -90,12 +91,12 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
   "sns_instagram": "Instagramアカウント（名刺に明記されている場合のみ）",
   "sns_linkedin": "LinkedInアカウント（名刺に明記されている場合のみ）",
   "sns_other": "その他のSNS等のURL",
-  "gathered_links": "",
   "aiAnalysis": "AI分析コメント" 
 }
 
 条件（超重要🚨）:
 - 日本語の氏名、会社名、住所などは「名刺に書かれている文字の通り」正確に読み取ってください。
+- ローマ字での名前表記（フリガナ代わり）が名刺にある場合は、'name_romaji'として必ず抽出してください。
 - 住所、部署、役職、電話番号などは細かく適切に分割してください。
 - 企業名等のゆらぎについて：「(株)」や「㈱」といった略称が記載されている場合でも、**必ず「株式会社」という正式名称に変換して出力**してください。「(有)」は「有限会社」に統一してください。ここは絶対に守ってください。
 - **名刺に直接書かれていない情報の推測・検索補完は一切行わないでください。**存在しないSNSアカウント、適当なURL、検索結果などで空欄を埋める行為は厳禁です。該当の記載がなければ必ず「空文字("")」にしてください。
@@ -257,6 +258,10 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                                     <input type="text" className="input-field" defaultValue={scanResult.name} onChange={(e) => setScanResult({ ...scanResult, name: e.target.value })} />
                                 </div>
                                 <div className="input-group">
+                                    <span className="input-label">氏名（ローマ字）</span>
+                                    <input type="text" className="input-field" defaultValue={scanResult.name_romaji || ''} onChange={(e) => setScanResult({ ...scanResult, name_romaji: e.target.value })} />
+                                </div>
+                                <div className="input-group">
                                     <span className="input-label">会社名</span>
                                     <input type="text" className="input-field" defaultValue={scanResult.company} onChange={(e) => setScanResult({ ...scanResult, company: e.target.value })} />
                                 </div>
@@ -347,15 +352,6 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                                         rows={3}
                                         defaultValue={scanResult.aiAnalysis}
                                         onChange={(e) => setScanResult({ ...scanResult, aiAnalysis: e.target.value })}
-                                    />
-                                </div>
-                                <div className="input-group" style={{ gridColumn: '1 / -1' }}>
-                                    <span className="input-label">ウェブ検索の収集リンク</span>
-                                    <textarea
-                                        className="input-field"
-                                        rows={4}
-                                        defaultValue={scanResult.gathered_links || ''}
-                                        onChange={(e) => setScanResult({ ...scanResult, gathered_links: e.target.value })}
                                     />
                                 </div>
                             </div>

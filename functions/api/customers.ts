@@ -17,7 +17,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             name, company, role, department,
             email, phone, phone_mobile, fax,
             address, postal_code, prefecture, city, address_line1, address_line2,
-            website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
+            website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, name_romaji,
             exchanger, business_category, tags, memo, imageUrl, aiAnalysis
         } = data;
 
@@ -26,7 +26,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
                 name, company, role, department, 
                 email, phone, phone_mobile, fax, 
                 address, postal_code, prefecture, city, address_line1, address_line2, 
-                website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
+                website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, name_romaji,
                 exchanger, business_category, tags, memo, image_url, ai_analysis
             ) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -51,7 +51,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             sns_instagram || '',
             sns_linkedin || '',
             sns_other || '',
-            gathered_links || '',
+            name_romaji || '',
             exchanger || '',
             business_category || '',
             tags || '',

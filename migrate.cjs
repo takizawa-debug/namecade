@@ -38,6 +38,7 @@ async function main() {
 構造:
 { 
   "name": "氏名", 
+  "name_romaji": "氏名のローマ字読み（名刺に明記されている場合のみ。ない場合は空文字）",
   "company": "会社名", 
   "department": "部署（ない場合は空文字）", 
   "role": "役職（ない場合は空文字）", 
@@ -56,11 +57,17 @@ async function main() {
   "sns_instagram": "Instagramアカウント（名刺に明記されている場合のみ）",
   "sns_linkedin": "LinkedInアカウント（名刺に明記されている場合のみ）",
   "sns_other": "その他のSNS等のURL",
-  "gathered_links": "",
   "aiAnalysis": "AI分析コメント" 
 }
 
-JSONフォーマット以外（説明テキストや\`\`\`jsonなどのマークダウン）は一切出力しないでください。`;
+条件（超重要🚨）:
+- 日本語の氏名、会社名、住所などは「名刺に書かれている文字の通り」正確に読み取ってください。
+- ローマ字での名前表記（フリガナ代わり）が名刺にある場合は、'name_romaji'として必ず抽出してください。
+- 住所、部署、役職、電話番号などは細かく適切に分割してください。
+- 企業名等のゆらぎについて：「(株)」や「㈱」といった略称が記載されている場合でも、**必ず「株式会社」という正式名称に変換して出力**してください。「(有)」は「有限会社」に統一してください。ここは絶対に守ってください。
+- **名刺に直接書かれていない情報の推測・検索補完は一切行わないでください。**存在しないSNSアカウント、適当なURL、検索結果などで空欄を埋める行為は厳禁です。該当の記載がなければ必ず「空文字("")」にしてください。
+- AI分析コメントは、名刺から得られた「客観的な事実（業種・部署・役職など）」のみから推測される、どのようなビジネスの接点になり得るかという簡潔なコメントを100文字程度で記述してください。
+- JSONフォーマット以外（説明テキストや\`\`\`jsonなどのマークダウン）は一切出力しないでください。`;
 
         const payload = {
             contents: [
@@ -122,13 +129,13 @@ JSONフォーマット以外（説明テキストや\`\`\`jsonなどのマーク
                         name, company, role, department, 
                         email, phone, phone_mobile, fax, 
                         address, postal_code, prefecture, city, address_line1, address_line2, 
-                        website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
+                        website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, name_romaji,
                         tags, memo, image_url, ai_analysis
                     ) VALUES (
                         '${escape(info.name)}', '${escape(info.company)}', '${escape(info.role)}', '${escape(info.department)}', 
                         '${escape(info.email)}', '${escape(info.phone)}', '${escape(info.phone_mobile)}', '${escape(info.fax)}', 
                         '${escape(combinedAddress)}', '${escape(info.postal_code)}', '${escape(info.prefecture)}', '${escape(info.city)}', '${escape(info.address_line1)}', '${escape(info.address_line2)}', 
-                        '${escape(info.website)}', '${escape(info.sns_x)}', '${escape(info.sns_facebook)}', '${escape(info.sns_instagram)}', '${escape(info.sns_linkedin)}', '${escape(info.sns_other)}', '${escape(info.gathered_links)}',
+                        '${escape(info.website)}', '${escape(info.sns_x)}', '${escape(info.sns_facebook)}', '${escape(info.sns_instagram)}', '${escape(info.sns_linkedin)}', '${escape(info.sns_other)}', '${escape(info.name_romaji)}',
                         'マイグレーション', 'Google Driveから一括インポート', '${escape(file)}', '${escape(info.aiAnalysis || info.ai_analysis)}'
                     );\n`;
 
