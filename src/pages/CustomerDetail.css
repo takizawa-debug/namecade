@@ -51,21 +51,6 @@
     text-align: center;
 }
 
-.profile-avatar-large {
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
-    color: var(--color-text-inverse);
-    font-size: 3rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 1.5rem;
-    box-shadow: var(--shadow-lg);
-}
-
 .profile-main-info {
     display: flex;
     flex-direction: column;

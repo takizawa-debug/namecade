@@ -101,20 +101,6 @@
     gap: 1rem;
 }
 
-.avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
-    color: var(--color-text-inverse);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 1.25rem;
-    box-shadow: var(--shadow-sm);
-}
-
 .font-medium {
     font-weight: 600;
     color: var(--color-text-base);

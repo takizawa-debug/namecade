@@ -1,3 +1,5 @@
+/// <reference types="@cloudflare/workers-types" />
+
 interface Env {
     BUCKET: R2Bucket;
 }
@@ -15,7 +17,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
         const publicUrl = `/api/image/${filename}`;
         return Response.json({ success: true, url: publicUrl, filename });
-    } catch (error: any) {
-        return Response.json({ success: false, error: error.message }, { status: 500 });
+    } catch (error) {
+        return Response.json({ success: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 });
     }
 };

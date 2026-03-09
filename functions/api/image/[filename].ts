@@ -1,9 +1,11 @@
+/// <reference types="@cloudflare/workers-types" />
+
 interface Env {
     BUCKET: R2Bucket;
 }
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
-    const filename = context.params.filename as string;
+    const filename = decodeURIComponent(context.params.filename as string);
     const object = await context.env.BUCKET.get(filename);
 
     if (object === null) {

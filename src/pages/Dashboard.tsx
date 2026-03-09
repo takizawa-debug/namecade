@@ -5,7 +5,7 @@ import './Dashboard.css';
 
 // Mock Data
 const MOCK_CUSTOMERS = [
-    { id: 1, name: '山田 太郎', company: 'テック株式会社', role: 'CTO', email: 'taro@example.com', segment: '大企業', addedAt: '2026-03-01' },
+    { id: 1, name: '山田 太郎', company: 'テック株式会社', role: 'CTO', email: 'taro@example.com', business_category: '大企業', addedAt: '2026-03-01' },
 ];
 
 const Dashboard = () => {
@@ -72,7 +72,7 @@ const Dashboard = () => {
                         <tr>
                             <th>連絡先名</th>
                             <th>会社名 & 役職</th>
-                            <th>セグメント</th>
+                            <th>事業区分</th>
                             <th>追加日</th>
                             <th></th>
                         </tr>
@@ -87,7 +87,6 @@ const Dashboard = () => {
                                 <tr key={customer.id} onClick={() => navigate(`/customer/${customer.id}`)} className="clickable-row">
                                     <td>
                                         <div className="contact-info">
-                                            <div className="avatar">{(customer.name || 'U').charAt(0)}</div>
                                             <div>
                                                 <div className="font-medium">{customer.name || '不明'}</div>
                                                 <div className="text-small text-muted">{customer.email}</div>
@@ -99,7 +98,7 @@ const Dashboard = () => {
                                         <div className="text-small text-muted">{customer.role}</div>
                                     </td>
                                     <td>
-                                        <span className="badge">{customer.segment || '未設定'}</span>
+                                        <span className="badge">{customer.business_category || '未設定'}</span>
                                     </td>
                                     <td>{new Date(customer.addedAt || customer.added_at || Date.now()).toLocaleDateString()}</td>
                                     <td>
