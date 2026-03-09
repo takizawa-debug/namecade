@@ -1,66 +1,163 @@
 INSERT INTO customers (
-    name, company, role, department, email, phone, phone_mobile, fax,
-    address, postal_code, prefecture, city, address_line1, address_line2,
-    website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
-    tags, memo, image_url, ai_analysis, exchanger, business_category
-) VALUES 
-(
-    '山田 太郎', '株式会社テックイノベーション', '代表取締役', '経営企画室', 'taro.yamada@tech-innovation.jp', '03-1234-5678', '090-1234-5678', '03-1234-5679',
-    '東京都渋谷区渋谷1-2-3 テックビル5F', '150-0002', '東京都', '渋谷区', '渋谷1-2-3', 'テックビル5F',
-    'https://tech-innovation.jp', 'https://x.com/tech_taro', 'https://facebook.com/taro.yamada', '', 'https://linkedin.com/in/taroyamada', '', '- https://tech-innovation.jp\n- https://x.com/tech_taro',
-    'IT, 経営者', '先日のカンファレンスで名刺交換。', 'スキャン 2026_03_09 11:49:23.pdf', 'IT業界でのイノベーション推進に強みを持つ企業の代表。新規プロジェクトの技術支援などで協業の可能性があります。', '滝沢 裕樹', 'IT・通信'
-),
-(
-    '佐藤 花子', '株式会社グローバルデザイン', 'チーフデザイナー', 'クリエイティブ部', 'hanako.sato@global-design.co.jp', '06-9876-5432', '080-9876-5432', '06-9876-5433',
-    '大阪府大阪市北区梅田2-3-4 グローバルタワー10F', '530-0001', '大阪府', '大阪市北区', '梅田2-3-4', 'グローバルタワー10F',
-    'https://global-design.co.jp', '', '', 'https://instagram.com/hanako_design', '', '', '- https://global-design.co.jp\n- https://note.com/hanako_sato',
-    'デザイン, クリエイティブ', 'Webリニューアルの件で相談可能。', 'スキャン 2026_03_09 12:59:48.pdf', '国内外のデザイン賞の受賞歴がある企業のチーフデザイナー。ブランディングからUI/UXまで幅広い専門性があります。デザイン関連の案件でのパートナー候補として有力です。', '滝沢 裕樹', 'デザイン・広告'
-),
-(
-    '鈴木 一郎', '有限会社エコフードシステム', '営業部長', '営業部', 'ichiro.suzuki@eco-food.co.jp', '052-111-2222', '070-1111-2222', '052-111-2223',
-    '愛知県名古屋市中区栄3-4-5 エコビル2F', '460-0008', '愛知県', '名古屋市中区', '栄3-4-5', 'エコビル2F',
-    'https://eco-food.co.jp', '', 'https://facebook.com/ichiro.suzuki.eco', '', '', '', '- https://eco-food.co.jp',
-    '食品, 営業', '新しい食品卸のルートについて情報交換。', 'スキャン 2026_03_09 13:00:30.pdf', '環境に配慮した食品の企画・卸売を行う企業。SDGs関連の取り組みにおいて協業の接点が持てそうです。', '滝沢 裕樹', '食品・卸売'
-),
-(
-    '田中 誠', '株式会社フューチャーシステムズ', 'シニアエンジニア', 'システム開発部', 'makoto.tanaka@futuresystems.co.jp', '092-222-3333', '090-2222-3333', '',
-    '福岡県福岡市博多区博多駅前4-5-6 フューチャービル3F', '812-0011', '福岡県', '福岡市博多区', '博多駅前4-5-6', 'フューチャービル3F',
-    'https://futuresystems.co.jp', 'https://x.com/makoto_sys', '', '', 'https://linkedin.com/in/makototanaka', 'https://github.com/makoto-sys', '- https://futuresystems.co.jp\n- https://github.com/makoto-sys',
-    '開発, エンジニア', 'システム開発の委託先として検討。', 'スキャン 2026_03_09 13:01:31.pdf', 'AI・IoTなどの先端技術を用いたシステム開発を得意とするシニアエンジニア。複雑な技術課題の解決において強力なパートナーになる可能性があります。', '滝沢 裕樹', 'IT・システム開発'
-),
-(
-    '伊藤 美咲', 'オーガニックコスメ株式会社', 'マーケティングマネージャー', 'マーケティング本部', 'misaki.ito@organic-cosme.co.jp', '011-333-4444', '', '011-333-4445',
-    '北海道札幌市中央区大通西5-6-7 オーガニックビル1F', '060-0042', '北海道', '札幌市中央区', '大通西5-6-7', 'オーガニックビル1F',
-    'https://organic-cosme.co.jp', '', '', 'https://instagram.com/misaki_organic', '', 'https://tiktok.com/@misaki_organic', '- https://organic-cosme.co.jp\n- https://instagram.com/organic_cosme_official',
-    'コスメ, マーケティング', 'SNSマーケティングの事例共有。', 'スキャン 2026_03_09 13:02:04.pdf', '若年層向けのオーガニックコスメを展開する企業のマーケティング担当。SNSを活用した新しいプロモーション施策の提案が響く可能性があります。', '滝沢 裕樹', '化粧品・美容'
-),
-(
-    '渡辺 健太', '株式会社スマートホーム', '建築士', '設計部', 'kenta.watanabe@smarthome.jp', '022-444-5555', '080-4444-5555', '022-444-5556',
-    '宮城県仙台市青葉区本町6-7-8 スマートビル4F', '980-0014', '宮城県', '仙台市青葉区', '本町6-7-8', 'スマートビル4F',
-    'https://smarthome.jp', '', 'https://facebook.com/kenta.watanabe', 'https://instagram.com/kenta_arch', '', '', '- https://smarthome.jp',
-    '建築, 住宅', '住宅展示場で名刺交換。', 'スキャン 2026_03_09 13:02:39.pdf', 'IoTを活用したスマートホームの設計・施工を行う企業の建築士。住宅向けの新しいテクノロジーやサービスの導入に関する提案が有効です。', '滝沢 裕樹', '建築・不動産'
-),
-(
-    '中村 結衣', 'エデュケーションプラス株式会社', '広報・PRチーフ', '広報部', 'yui.nakamura@edu-plus.co.jp', '082-555-6666', '090-5555-6666', '',
-    '広島県広島市中区八丁堀7-8-9 エデュケーションビル8F', '730-0013', '広島県', '広島市中区', '八丁堀7-8-9', 'エデュケーションビル8F',
-    'https://edu-plus.co.jp', 'https://x.com/yui_edupr', '', '', '', '', '- https://edu-plus.co.jp\n- https://prtimes.jp/main/html/searchrlp/company_id/12345',
-    '教育, 広報', '来月のPRイベントへの協賛について検討。', 'スキャン 2026_03_09 13:03:01.pdf', 'EdTech関連のサービスを展開する企業の広報チーフ。教育機関向けのメディア等でのアライアンス・共同プロモーションの提案が刺さりそうです。', '滝沢 裕樹', '教育・学習支援'
-),
-(
-    '小林 大輔', '株式会社グローバルロジスティクス', '物流コンサルタント', 'コンサルティング本部', 'daisuke.kobayashi@global-logi.com', '03-6666-7777', '070-6666-7777', '03-6666-7778',
-    '東京都港区六本木8-9-10 ロジスティクスタワー20F', '106-0032', '東京都', '港区', '六本木8-9-10', 'ロジスティクスタワー20F',
-    'https://global-logi.com', '', '', '', 'https://linkedin.com/in/daisukekobayashi-logi', '', '- https://global-logi.com\n- https://logi-biz.com/article/12345',
-    '物流, コンサル', 'サプライチェーン最適化について相談。', 'スキャン 2026_03_09 13:03:23.pdf', '国際的な物流システム構築のコンサルティングを行うエキスパート。物流DXや効率化システムなどの提案や共同開発が考えられます。', '滝沢 裕樹', '運輸・物流'
-),
-(
-    '加藤 優子', 'メディカルサポートセンター株式会社', '営業アシスタント', '営業第一部', 'yuko.kato@medical-support.co.jp', '045-777-8888', '090-7777-8888', '045-777-8889',
-    '神奈川県横浜市西区みなとみらい9-10-11 メディカルビル6F', '220-0012', '神奈川県', '横浜市西区', 'みなとみらい9-10-11', 'メディカルビル6F',
-    'https://medical-support.co.jp', '', '', '', '', '', '- https://medical-support.co.jp',
-    '医療, 営業サポート', '展示会でのブース対応にて。', 'スキャン 2026_03_09 13:04:07.pdf', '医療機関向けのシステムや機材を提供する企業。営業ツールの効率化や、医療業界向けの新規サービスの展開チャネルとして期待できます。', '滝沢 裕樹', '医療・福祉'
-),
-(
-    '吉田 健太', '株式会社アクティブスポーツ', '店舗マネージャー', 'リテール事業部', 'kenta.yoshida@active-sports.jp', '098-888-9999', '080-8888-9999', '',
-    '沖縄県那覇市松山10-11-12 アクティブプラザ1F', '900-0032', '沖縄県', '那覇市', '松山10-11-12', 'アクティブプラザ1F',
-    'https://active-sports.jp', 'https://x.com/active_naha', 'https://facebook.com/activesports.naha', 'https://instagram.com/active_sports_naha', '', '', '- https://active-sports.jp\n- https://x.com/active_naha',
-    'スポーツ, 小売', '店舗向け決済システムの提案。', 'スキャン 2026_03_09 13:06:58.pdf', '沖縄県内で展開するスポーツ用品店のマネージャー。店舗のDX化、インバウンド対応システムなどの導入提案が課題解決に繋がる可能性があります。', '滝沢 裕樹', '小売・流通'
-);
+                        name, company, role, department, 
+                        email, phone, phone_mobile, fax, 
+                        address, postal_code, prefecture, city, address_line1, address_line2, 
+                        website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
+                        tags, memo, image_url, ai_analysis
+                    ) VALUES (
+                        '倭文 隆広', '城南信用金庫', '事務局長', '営業部本店 ソーシャル・ボランティア部', 
+                        '', '03-3493-9031', '', '03-3491-3954', 
+                        '東京都品川区西五反田7-2-3', '141-8710', '東京都', '品川区', '西五反田7-2-3', '', 
+                        'https://www.jsbank.co.jp', 'https://twitter.com/johnan_shinkin', 'https://www.facebook.com/johnanshinkin/', '', '', '', '- https://www.jsbank.co.jp
+- https://www.facebook.com/johnanshinkin/
+- https://twitter.com/johnan_shinkin
+- https://www.jsbank.co.jp/social/
+- https://www.jsbank.co.jp/about/sdgs/',
+                        'マイグレーション', 'Google Driveから一括インポート', 'スキャン 2026_03_09 11:49:23.pdf', '城南信用金庫でSDGsや脱炭素（RE100）を推進する社会貢献部門の責任者です。名刺に再生紙を利用するなど環境意識が極めて高く、企業のESG経営支援や地域課題解決を軸とした共創プロジェクトにおいて重要なキーマンとなります。地域密着型の金融機関として、地元の社会貢献活動を通じたビジネスマッチングの機会が期待できます。'
+                    );
+INSERT INTO customers (
+                        name, company, role, department, 
+                        email, phone, phone_mobile, fax, 
+                        address, postal_code, prefecture, city, address_line1, address_line2, 
+                        website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
+                        tags, memo, image_url, ai_analysis
+                    ) VALUES (
+                        '豊田 忠治', 'ジョニティー', '', '', 
+                        'jonity315@gmail.com', '026-255-3836', '090-2228-9357', '026-255-3836', 
+                        '長野県上水内郡信濃町大字古間1461-17', '389-1313', '長野県', '上水内郡信濃町', '大字古間1461-17', '', 
+                        '', '', 'https://www.facebook.com/jonity.exterior/', 'https://www.instagram.com/jonity.exterior/', '', '', '- https://www.facebook.com/jonity.exterior/
+- https://www.instagram.com/jonity.exterior/
+- https://itp.ne.jp/info/203437531123331510/',
+                        'マイグレーション', 'Google Driveから一括インポート', 'スキャン 2026_03_09 12:59:48.pdf', '長野県を拠点にエクステリアや外構工事、リフォーム等を幅広く手掛ける専門業者です。スタンプコンクリートなど意匠性の高い施工も得意としており、住宅メーカーや地元の施主との強い接点が伺えます。SNSでの施工事例発信も積極的で、資材供給や共同受注、リフォーム案件の相互紹介などでビジネスチャンスが見込めます。'
+                    );
+INSERT INTO customers (
+                        name, company, role, department, 
+                        email, phone, phone_mobile, fax, 
+                        address, postal_code, prefecture, city, address_line1, address_line2, 
+                        website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
+                        tags, memo, image_url, ai_analysis
+                    ) VALUES (
+                        '田中 諒成', '株式会社本久', '副支店長 兼 前橋営業所 所長', '基礎建設事業部 基礎建築部 関東支店', 
+                        'a.tanaka@motoq.co.jp', '048-816-9757', '080-7783-8696', '048-816-9758', 
+                        '埼玉県さいたま市南区南本町1-2-13三貴ビル7F', '336-0018', '埼玉県', 'さいたま市南区', '南本町1-2-13', '三貴ビル7F', 
+                        'https://www.motoq.co.jp/', '', 'https://www.facebook.com/motoq.co.jp/', 'https://www.instagram.com/motoq_official/', '', '', '- https://www.motoq.co.jp/
+- https://www.facebook.com/motoq.co.jp/
+- https://www.instagram.com/motoq_official/
+- https://www.motoq.co.jp/foundation/
+- https://www.motoq.co.jp/company/history/',
+                        'マイグレーション', 'Google Driveから一括インポート', 'スキャン 2026_03_09 13:00:30.pdf', '1717年創業の超老舗企業で、地盤改良や基礎工事の独自工法を多数保有しています。田中氏は関東支店の副支店長兼営業所長を務める要職にあり、建築士会等の賛助会員でもあることから、設計段階からの技術提案に強みがあります。新規建設案件の地盤対策や特殊工法を要する現場での協業、資材供給の提案が有効なビジネスチャンスとなります。'
+                    );
+INSERT INTO customers (
+                        name, company, role, department, 
+                        email, phone, phone_mobile, fax, 
+                        address, postal_code, prefecture, city, address_line1, address_line2, 
+                        website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
+                        tags, memo, image_url, ai_analysis
+                    ) VALUES (
+                        '板垣 学', 'ヤンマーホールディングス株式会社', '', '社長室 企画グループ', 
+                        'manabu_itagaki@yanmar.com', '', '090-5156-4167', '', 
+                        '大阪府大阪市北区茶屋町1-32YANMAR FLYING-Y BUILDING', '530-0013', '大阪府', '大阪市北区', '茶屋町1-32', 'YANMAR FLYING-Y BUILDING', 
+                        'https://www.yanmar.com/', 'https://x.com/yanmarofficial', 'https://www.facebook.com/YANMAR.Official/', 'https://www.instagram.com/yanmarofficial/', 'https://www.linkedin.com/company/yanmar-holdings-co-ltd-/', '', '- https://www.yanmar.com/jp/
+- https://www.facebook.com/YANMAR.Official/
+- https://x.com/yanmarofficial
+- https://www.instagram.com/yanmarofficial/
+- https://www.linkedin.com/company/yanmar-holdings-co-ltd-/',
+                        'マイグレーション', 'Google Driveから一括インポート', 'スキャン 2026_03_09 13:01:31.pdf', 'ヤンマーホールディングスの社長室企画グループに所属されており、経営戦略や新規事業立案に深く関わる立場と推察されます。同社は「A SUSTAINABLE FUTURE」を掲げ、脱炭素やスマート農業、DX推進に注力しています。これらに関連する先端技術や、グローバル展開を支援する戦略的パートナーシップの提案が、ビジネスチャンスとして非常に有効です。'
+                    );
+INSERT INTO customers (
+                        name, company, role, department, 
+                        email, phone, phone_mobile, fax, 
+                        address, postal_code, prefecture, city, address_line1, address_line2, 
+                        website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
+                        tags, memo, image_url, ai_analysis
+                    ) VALUES (
+                        '松澤 怜央', 'hair & spa SteeZ', '代表', '', 
+                        'steezhair.izuna25@gmail.com', '', '070-9048-2768', '', 
+                        '長野県上水内郡飯綱町倉井字大久保4537-6', '389-1204', '長野県', '上水内郡飯綱町', '倉井字大久保4537-6', '', 
+                        '', '', '', 'https://www.instagram.com/steez_hair_spa/', '', 'https://line.me/R/ti/p/@014vunzz', '- https://beauty.hotpepper.jp/slnH000645421/
+- https://www.instagram.com/steez_hair_spa/
+- https://line.me/R/ti/p/@014vunzz',
+                        'マイグレーション', 'Google Driveから一括インポート', 'スキャン 2026_03_09 13:02:04.pdf', '長野県飯綱町にて「hair & spa SteeZ」を運営する松澤氏は、地域に根ざした美容・リラクゼーションサービスを提供しています。Instagramや公式LINEを積極的に活用しており、デジタル接点を重視した集客が特徴です。最新の美容機器やヘアケア製品の導入提案、また地域活性化を目的とした異業種連携などの接点が期待できます。'
+                    );
+INSERT INTO customers (
+                        name, company, role, department, 
+                        email, phone, phone_mobile, fax, 
+                        address, postal_code, prefecture, city, address_line1, address_line2, 
+                        website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
+                        tags, memo, image_url, ai_analysis
+                    ) VALUES (
+                        '谷津 誠也', '山ノ内町', '', '未来創造課 移住国際交流係', 
+                        'iju-teiju@town.yamanouchi.lg.jp', '0269-33-3113', '', '0269-33-4527', 
+                        '長野県下高井郡山ノ内町大字平穏 3352-1', '381-0498', '長野県', '下高井郡山ノ内町', '大字平穏 3352-1', '', 
+                        'https://kurasuyamanouchi.com/', '', 'https://www.facebook.com/kurasuyamanouchi/', 'https://www.instagram.com/kurasuyamanouchi/', '', '', '- https://www.town.yamanouchi.nagano.jp/
+- https://kurasuyamanouchi.com/
+- https://www.facebook.com/kurasuyamanouchi/
+- https://www.instagram.com/kurasuyamanouchi/',
+                        'マイグレーション', 'Google Driveから一括インポート', 'スキャン 2026_03_09 13:02:39.pdf', '長野県山ノ内町の未来創造課に所属し、移住促進や国際交流を推進されています。同町は志賀高原や湯田中渋温泉郷を擁する有数の観光地であり、インバウンド需要やワーケーション、地方創生に関連するビジネスチャンスが豊富です。移住支援や地域活性化、多文化共生に関するソリューション提案が有効な接点となるでしょう。'
+                    );
+INSERT INTO customers (
+                        name, company, role, department, 
+                        email, phone, phone_mobile, fax, 
+                        address, postal_code, prefecture, city, address_line1, address_line2, 
+                        website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
+                        tags, memo, image_url, ai_analysis
+                    ) VALUES (
+                        '徳田 浩一', '株式会社 Shelltas', '代表取締役', '', 
+                        'tokuda@shelltas.com', '03-6303-7211', '080-4887-0726', '', 
+                        '東京都大田区中央1-16-8シャンボール大森119', '143-0024', '東京都', '大田区', '中央1-16-8', 'シャンボール大森119', 
+                        'https://shelltas.com/', '', 'https://www.facebook.com/shelltas/', 'https://www.instagram.com/shelltas_official/', 'https://www.linkedin.com/in/koichi-tokuda-6b1b1b1b/', '', '- https://shelltas.com/
+- https://www.facebook.com/shelltas/
+- https://www.instagram.com/shelltas_official/
+- https://www.linkedin.com/in/koichi-tokuda-6b1b1b1b/
+- https://prtimes.jp/main/html/searchrlp/company_id/78444',
+                        'マイグレーション', 'Google Driveから一括インポート', 'スキャン 2026_03_09 13:03:01.pdf', 'ホタテ貝殻をアップサイクルした高機能素材を展開するSDGs志向の企業です。抗菌・消臭効果を持つ塗料や土壌改良材の開発に加え、茨城県での実験農業も手掛けています。環境負荷低減を目指す建設・不動産関連企業や、サステナブルな資材調達を求める自治体との連携、新素材を活用した共同開発の機会が期待できます。'
+                    );
+INSERT INTO customers (
+                        name, company, role, department, 
+                        email, phone, phone_mobile, fax, 
+                        address, postal_code, prefecture, city, address_line1, address_line2, 
+                        website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
+                        tags, memo, image_url, ai_analysis
+                    ) VALUES (
+                        '手塚 琉盛', 'チーム・スナバ', '', '', 
+                        '', '', '', '', 
+                        '長野県塩尻市大門八番町1-28', '399-0737', '長野県', '塩尻市', '大門八番町1-28', '', 
+                        'https://www.sunaba.org', 'https://x.com/sunaba_shiojiri', 'https://www.facebook.com/sunaba.shiojiri/', 'https://www.instagram.com/sunaba_shiojiri/', '', '', '- https://www.sunaba.org
+- https://www.facebook.com/sunaba.shiojiri/
+- https://x.com/sunaba_shiojiri
+- https://www.instagram.com/sunaba_shiojiri/
+- https://note.com/sunaba_shiojiri',
+                        'マイグレーション', 'Google Driveから一括インポート', 'スキャン 2026_03_09 13:03:23.pdf', '長野県塩尻市のシビック・イノベーション拠点「スナバ」の運営に携わる人物です。起業支援やコミュニティ運営を通じ、地域課題の解決や新事業創出を推進しています。地方創生や官民連携プロジェクト、地域での実証実験を検討している企業にとって、現地のスタートアップや行政との橋渡し役として非常に有益な接点となります。'
+                    );
+INSERT INTO customers (
+                        name, company, role, department, 
+                        email, phone, phone_mobile, fax, 
+                        address, postal_code, prefecture, city, address_line1, address_line2, 
+                        website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
+                        tags, memo, image_url, ai_analysis
+                    ) VALUES (
+                        '中原 有紀子', '京都大学', '研究員', '成長戦略本部 統括事業部 エコシステム構築領域 イノベーション マネジメント サイエンス(IMS)部', 
+                        'nakahara.yukiko.7e@kyoto-u.ac.jp', '075-753-9146', '', '', 
+                        '京都府京都市左京区吉田本町国際科学イノベーション棟 東館 2階 214号室', '606-8501', '京都府', '京都市左京区', '吉田本町', '国際科学イノベーション棟 東館 2階 214号室', 
+                        'https://www.kyoto-u.ac.jp/', '', '', '', '', 'https://researchmap.jp/read0156358', '- https://www.kyoto-u.ac.jp/
+- https://www.ims.kyoto-u.ac.jp/
+- https://www.saci.kyoto-u.ac.jp/
+- https://researchmap.jp/read0156358',
+                        'マイグレーション', 'Google Driveから一括インポート', 'スキャン 2026_03_09 13:04:07.pdf', '京都大学の成長戦略本部にて、イノベーション・マネジメント・サイエンス（IMS）の研究に従事されています。産官学連携やエコシステム構築を担う部署であり、技術経営や新規事業創出に関する高度な知見を有していると推察されます。大学の技術シーズを活用した共同研究や、スタートアップ支援を通じたビジネス創出の機会において、非常に重要なキーマンとなる可能性があります。'
+                    );
+INSERT INTO customers (
+                        name, company, role, department, 
+                        email, phone, phone_mobile, fax, 
+                        address, postal_code, prefecture, city, address_line1, address_line2, 
+                        website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, gathered_links,
+                        tags, memo, image_url, ai_analysis
+                    ) VALUES (
+                        '小林 弘治', '株式会社フードワークス', '花蝶 料理長', 'メニュー開発部', 
+                        'k_kobayashi@foodworks.jp', '03-6426-7951', '080-4138-7713', '03-6426-2324', 
+                        '東京都目黒区目黒1-24-12オリックス目黒ビル2F', '153-0063', '東京都', '目黒区', '目黒1-24-12', 'オリックス目黒ビル2F', 
+                        'https://www.foodworks.co.jp/', '', 'https://www.facebook.com/koji.kobayashi.754', '', '', '', '- https://www.foodworks.co.jp/
+- https://kacho.jp/
+- https://www.facebook.com/koji.kobayashi.754
+- https://tabelog.com/tokyo/A1301/A130101/13002313/',
+                        'マイグレーション', 'Google Driveから一括インポート', 'スキャン 2026_03_09 13:06:58.pdf', '株式会社フードワークスは銀座の名店「花蝶」を運営し、多角的な飲食事業を展開しています。小林氏は料理長兼メニュー開発担当として、現場の指揮と商品開発の両面を担う重要人物です。高級食材の卸売提案や、店舗運営ノウハウを活かしたBtoBコラボ、新規業態開発のコンサルティング等で有益なビジネスチャンスが期待できます。'
+                    );

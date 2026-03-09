@@ -80,9 +80,6 @@ async function main() {
                     ]
                 }
             ],
-            tools: [
-                { googleSearch: {} }
-            ],
             generationConfig: {
                 temperature: 0.1,
             }
@@ -93,7 +90,7 @@ async function main() {
 
         while (!success && retries < 4) {
             try {
-                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
