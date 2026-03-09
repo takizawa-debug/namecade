@@ -41,6 +41,7 @@ const Dashboard = () => {
     const [customers, setCustomers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
 
     // sorting, filtering, and bulk editing state
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
@@ -56,6 +57,21 @@ const Dashboard = () => {
 
     useEffect(() => {
         fetchCustomers();
+
+        // Resume sync if there's a pending state
+        const savedSync = localStorage.getItem('namecard_sync_state');
+        if (savedSync) {
+            try {
+                const state = JSON.parse(savedSync);
+                if (state && state.isRunning && state.files && state.currentIndex < state.files.length) {
+                    startOrResumeSync(true, state);
+                } else {
+                    localStorage.removeItem('namecard_sync_state');
+                }
+            } catch (e) {
+                localStorage.removeItem('namecard_sync_state');
+            }
+        }
     }, []);
 
     const fetchCustomers = () => {
@@ -149,51 +165,83 @@ const Dashboard = () => {
         });
     };
 
-    const updateLog = (id: string, updates: Partial<SyncLog>) => {
-        setLogs(prev => prev.map(log => log.id === id ? { ...log, ...updates } : log));
-    };
+    // updateLog was removed.
 
-    const handleDriveSync = async () => {
+    const handleDriveSync = () => startOrResumeSync(false, null);
+
+    const startOrResumeSync = async (isResume = false, savedState: any = null) => {
         if (syncing) return;
         setSyncing(true);
         setShowSyncPanel(true);
-        setLogs([]);
-        setProgressStats({ total: 0, current: 0 });
 
-        try {
-            // 1. Get List of files
-            const listRes = await fetch('/api/drive/list');
-            if (!listRes.ok) throw new Error(await listRes.text());
-            const listData = await listRes.json();
+        let currentState: any;
+        if (isResume && savedState) {
+            currentState = savedState;
+            setLogs(currentState.logs);
+            setProgressStats({ total: currentState.files.length, current: currentState.currentIndex });
+        } else {
+            setLogs([]);
+            setProgressStats({ total: 0, current: 0 });
 
-            if (!listData.success) throw new Error(listData.error);
+            try {
+                // 1. Get List of files
+                const listRes = await fetch('/api/drive/list');
+                if (!listRes.ok) throw new Error(await listRes.text());
+                const listData = await listRes.json();
 
-            const files = listData.files || [];
-            if (files.length === 0) {
-                alert("Googleドライブの「未登録」フォルダに新しい名刺画像がありません。");
+                if (!listData.success) throw new Error(listData.error);
+
+                const files = listData.files || [];
+                if (files.length === 0) {
+                    alert("Googleドライブの「未登録」フォルダに新しい名刺画像がありません。");
+                    setSyncing(false);
+                    setTimeout(() => setShowSyncPanel(false), 3000);
+                    return;
+                }
+
+                const initialLogs: SyncLog[] = files.map((f: any) => ({
+                    id: f.id,
+                    fileName: f.name,
+                    status: 'pending'
+                }));
+
+                currentState = { isRunning: true, files, logs: initialLogs, currentIndex: 0, newCustomersFound: false };
+                setLogs(initialLogs);
+                setProgressStats({ total: files.length, current: 0 });
+                localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+            } catch (err: any) {
+                console.error("Failed to fetch list", err);
+                alert("リスト取得中にエラーが発生しました。");
                 setSyncing(false);
-                setTimeout(() => setShowSyncPanel(false), 3000);
+                setShowSyncPanel(false);
                 return;
             }
+        }
 
-            const initialLogs: SyncLog[] = files.map((f: any) => ({
-                id: f.id,
-                fileName: f.name,
-                status: 'pending'
-            }));
-            setLogs(initialLogs);
-            setProgressStats({ total: files.length, current: 0 });
+        try {
+            // Process files from current index
+            for (let i = currentState.currentIndex; i < currentState.files.length; i++) {
+                currentState.currentIndex = i;
+                localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
 
-            let newCustomersFound = false;
-
-            // 2. Process each file one by one
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
+                const file = currentState.files[i];
                 setProgressStats(prev => ({ ...prev, current: i + 1 }));
+
+                // Ensure we use the latest logs array reference
+                let currentLogs = [...currentState.logs];
+                const updateLogLocal = (status: any, extra = {}) => {
+                    const idx = currentLogs.findIndex((l: any) => l.id === file.id);
+                    if (idx > -1) {
+                        currentLogs[idx] = { ...currentLogs[idx], status, ...extra };
+                        setLogs([...currentLogs]);
+                        currentState.logs = currentLogs;
+                        localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+                    }
+                };
 
                 try {
                     // Download
-                    updateLog(file.id, { status: 'downloading' });
+                    updateLogLocal('downloading');
                     const dlRes = await fetch('/api/drive/download', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -209,7 +257,7 @@ const Dashboard = () => {
                     const base64Data = await toBase64(blob);
 
                     // Parse
-                    updateLog(file.id, { status: 'parsing' });
+                    updateLogLocal('parsing');
                     const promptText = `あなたはプロフェッショナルな名刺情報抽出・分析アシスタントです。提供された名刺画像（表裏両面が含まれている場合もあります）から、以下の情報を日本語を最優先して極めて高い精度で抽出し、指定されたJSON構造のみを出力してください。
 
 抽出と同時に、取得した総合的な情報から、相手がどのような組織・業種に属しているか、どのような役立つ接点（ビジネスチャンスなど）が持てそうか等について「AI分析コメント（150文字程度）」を作成し、\`aiAnalysis\`フィールドに格納してください。裏面の情報も加味してください。WEBサイトのURLやQRコード等があればそれも抽出してください。
@@ -278,7 +326,7 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                         extracted.exchanger = file.folderName;
                     }
 
-                    updateLog(file.id, { status: 'saving', result: extracted });
+                    updateLogLocal('saving', { result: extracted });
 
                     const customerData = {
                         ...extracted,
@@ -309,22 +357,28 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                         throw new Error(`ドライブ移動エラー: ${moveErr.error || 'Unknown'}`);
                     }
 
-                    updateLog(file.id, { status: 'completed' });
-                    newCustomersFound = true;
+                    updateLogLocal('completed');
+                    currentState.newCustomersFound = true;
 
-                    if (extracted.company && !existingCompanies.includes(extracted.company)) {
-                        setExistingCompanies([...existingCompanies, extracted.company]);
+                    // If existingCompanies array is used (though closure might be stale, we use state setter cautiously)
+                    if (extracted.company) {
+                        setExistingCompanies(prev => prev.includes(extracted.company) ? prev : [...prev, extracted.company]);
                     }
 
                 } catch (err: any) {
                     console.error("File processing failed: ", file.name, err);
-                    updateLog(file.id, { status: 'error', errorMsg: err.message || String(err) });
+                    updateLogLocal('error', { errorMsg: err.message || String(err) });
                 }
             }
 
-            if (newCustomersFound) {
+            currentState.isRunning = false;
+            currentState.currentIndex = currentState.files.length;
+            localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+
+            if (currentState.newCustomersFound) {
                 fetchCustomers(); // Refresh the list after all are done
             }
+            localStorage.removeItem('namecard_sync_state');
 
             setTimeout(() => {
                 alert("Google Driveの同期・解析が完了しました！");
@@ -573,12 +627,30 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                                             <input
                                                 type="checkbox"
                                                 checked={selectedIds.includes(customer.id)}
-                                                onChange={(e) => {
-                                                    if (e.target.checked) {
-                                                        setSelectedIds([...selectedIds, customer.id]);
+                                                onChange={(e: any) => {
+                                                    let newSelectedIds = [...selectedIds];
+                                                    const index = filteredCustomers.findIndex(c => c.id === customer.id);
+
+                                                    if (e.nativeEvent.shiftKey && lastSelectedIndex !== null && lastSelectedIndex !== -1) {
+                                                        const start = Math.min(lastSelectedIndex, index);
+                                                        const end = Math.max(lastSelectedIndex, index);
+                                                        const idsInRange = filteredCustomers.slice(start, end + 1).map(c => c.id);
+
+                                                        if (e.target.checked) {
+                                                            newSelectedIds = [...new Set([...newSelectedIds, ...idsInRange])];
+                                                        } else {
+                                                            newSelectedIds = newSelectedIds.filter(id => !idsInRange.includes(id));
+                                                        }
                                                     } else {
-                                                        setSelectedIds(selectedIds.filter(id => id !== customer.id));
+                                                        if (e.target.checked) {
+                                                            newSelectedIds.push(customer.id);
+                                                        } else {
+                                                            newSelectedIds = newSelectedIds.filter(id => id !== customer.id);
+                                                        }
                                                     }
+
+                                                    setSelectedIds(newSelectedIds);
+                                                    setLastSelectedIndex(index);
                                                 }}
                                             />
                                         </td>
