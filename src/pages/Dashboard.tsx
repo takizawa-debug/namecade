@@ -21,7 +21,7 @@ const getHash = (str: string) => {
 };
 
 const getRowStyleForExchanger = (exchanger?: string) => {
-    if (!exchanger || exchanger === '-') return undefined;
+    if (!exchanger || exchanger === '-') return '#ffffff';
     const h = getHash(exchanger) % 360;
     return `hsl(${h}, 60%, 95%)`;
 };
@@ -375,7 +375,8 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
     const filteredCustomers = resultCustomers;
 
     const COLUMNS = [
-        { key: 'name', label: '氏名', width: '120px' },
+        { key: 'exchanger', label: '交換者', width: '140px' },
+        { key: 'name', label: '氏名', width: '140px' },
         { key: 'name_romaji', label: '氏名(ローマ字)', width: '120px' },
         { key: 'company', label: '会社名', width: '200px' },
         { key: 'department', label: '部署', width: '150px' },
@@ -397,7 +398,6 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
         { key: 'sns_other', label: 'その他SNS', width: '150px' },
         { key: 'business_category', label: '事業区分', width: '150px' },
         { key: 'tags', label: 'タグ', width: '150px' },
-        { key: 'exchanger', label: '交換者', width: '120px' },
         { key: 'memo', label: 'メモ', width: '250px' },
         { key: 'ai_analysis', label: 'AI分析', width: '300px' },
         { key: 'added_at', label: '追加日', width: '120px' }
@@ -515,7 +515,7 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                 <table className="data-table" style={{ minWidth: '2500px' }}>
                     <thead>
                         <tr>
-                            <th style={{ width: '40px', paddingLeft: '1.5rem', position: 'sticky', left: 0, background: '#f8fafc', zIndex: 20 }}>
+                            <th style={{ minWidth: '60px', width: '60px', textAlign: 'center', padding: '1rem', position: 'sticky', top: 0, left: 0, background: '#f8fafc', zIndex: 40, borderBottom: '1px solid #e2e8f0' }}>
                                 <input
                                     type="checkbox"
                                     checked={filteredCustomers.length > 0 && selectedIds.length === filteredCustomers.length}
@@ -528,24 +528,30 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                                     }}
                                 />
                             </th>
-                            {COLUMNS.map(col => (
-                                <th key={col.key} style={{ minWidth: col.width, zIndex: 10, verticalAlign: 'top', paddingTop: '12px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', cursor: 'pointer' }} onClick={() => handleSort(col.key)}>
-                                        {col.label}
-                                        {sortConfig?.key === col.key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-                                    </div>
-                                    <input
-                                        type="text"
-                                        placeholder="絞り込み..."
-                                        value={filters[col.key] || ''}
-                                        onClick={e => e.stopPropagation()}
-                                        onChange={e => setFilters({ ...filters, [col.key]: e.target.value })}
-                                        className="input-field"
-                                        style={{ width: '100%', padding: '4px 6px', fontSize: '11px', height: 'auto', minHeight: '24px' }}
-                                    />
-                                </th>
-                            ))}
-                            <th style={{ position: 'sticky', right: 0, background: '#f8fafc', zIndex: 20, width: '40px' }}></th>
+                            {COLUMNS.map(col => {
+                                const isStickyX = col.key === 'exchanger' || col.key === 'name';
+                                const left = col.key === 'exchanger' ? '60px' : col.key === 'name' ? '200px' : undefined;
+                                const zIndex = isStickyX ? 40 : 30;
+
+                                return (
+                                    <th key={col.key} style={{ minWidth: col.width, maxWidth: col.width, position: 'sticky', top: 0, left: left, zIndex: zIndex, background: '#f8fafc', verticalAlign: 'top', paddingTop: '12px', borderBottom: '1px solid #e2e8f0', boxShadow: isStickyX && col.key === 'name' ? '4px 0 6px -2px rgba(0,0,0,0.05)' : undefined }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', cursor: 'pointer' }} onClick={() => handleSort(col.key)}>
+                                            {col.label}
+                                            {sortConfig?.key === col.key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="絞り込み..."
+                                            value={filters[col.key] || ''}
+                                            onClick={e => e.stopPropagation()}
+                                            onChange={e => setFilters({ ...filters, [col.key]: e.target.value })}
+                                            className="input-field"
+                                            style={{ width: '100%', padding: '4px 6px', fontSize: '11px', height: 'auto', minHeight: '24px' }}
+                                        />
+                                    </th>
+                                );
+                            })}
+                            <th style={{ position: 'sticky', top: 0, right: 0, background: '#f8fafc', zIndex: 30, width: '40px', borderBottom: '1px solid #e2e8f0' }}></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -554,50 +560,57 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                         ) : filteredCustomers.length === 0 ? (
                             <tr><td colSpan={COLUMNS.length + 2} style={{ textAlign: 'center', padding: '40px' }}><span className="text-muted">データが見つかりません。</span></td></tr>
                         ) : (
-                            filteredCustomers.map((customer: any) => (
-                                <tr key={customer.id} onClick={() => navigate(`/customer/${customer.id}`)} className="clickable-row" style={{ backgroundColor: getRowStyleForExchanger(customer.exchanger) }}>
-                                    <td onClick={e => e.stopPropagation()} style={{ paddingLeft: '1.5rem', position: 'sticky', left: 0, background: 'inherit', zIndex: 5 }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedIds.includes(customer.id)}
-                                            onChange={(e) => {
-                                                if (e.target.checked) {
-                                                    setSelectedIds([...selectedIds, customer.id]);
-                                                } else {
-                                                    setSelectedIds(selectedIds.filter(id => id !== customer.id));
-                                                }
-                                            }}
-                                        />
-                                    </td>
-                                    {COLUMNS.map(col => {
-                                        let val = customer[col.key] || '-';
-                                        if (col.key === 'added_at') {
-                                            val = new Date(customer.addedAt || customer.added_at || Date.now()).toLocaleDateString();
-                                        } else if (col.key === 'website' && customer.website) {
-                                            val = <a href={customer.website} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#0ea5e9' }}>{customer.website}</a>;
-                                        } else if (col.key === 'sns_x' && customer.sns_x) {
-                                            val = <a href={customer.sns_x.startsWith('http') ? customer.sns_x : `https://x.com/${customer.sns_x}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#0ea5e9' }}>{customer.sns_x}</a>;
-                                        } else if (col.key === 'exchanger' && customer.exchanger && customer.exchanger !== '-') {
-                                            val = <span style={{ ...getChipStyleForExchanger(customer.exchanger), padding: '4px 10px', borderRadius: '16px', fontSize: '12px', fontWeight: 'bold', display: 'inline-block' }}>{customer.exchanger}</span>;
-                                        }
-                                        return (
-                                            <td key={col.key}>
-                                                <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: col.width }} title={String(customer[col.key] || '')}>
-                                                    {val}
-                                                </div>
-                                            </td>
-                                        );
-                                    })}
-                                    <td style={{ position: 'sticky', right: 0, background: 'inherit', zIndex: 5, paddingRight: '1rem' }} onClick={e => e.stopPropagation()}>
-                                        <button className="icon-btn danger" onClick={async () => {
-                                            if (window.confirm('この連絡先を削除しますか？')) {
-                                                await fetch(`/api/customers/${customer.id}`, { method: 'DELETE' });
-                                                fetchCustomers();
+                            filteredCustomers.map((customer: any) => {
+                                const rowBg = getRowStyleForExchanger(customer.exchanger);
+                                return (
+                                    <tr key={customer.id} onClick={() => navigate(`/customer/${customer.id}`)} className="clickable-row" style={{ backgroundColor: rowBg }}>
+                                        <td onClick={e => e.stopPropagation()} style={{ minWidth: '60px', width: '60px', textAlign: 'center', padding: '1rem', position: 'sticky', left: 0, background: rowBg, zIndex: 20 }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.includes(customer.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedIds([...selectedIds, customer.id]);
+                                                    } else {
+                                                        setSelectedIds(selectedIds.filter(id => id !== customer.id));
+                                                    }
+                                                }}
+                                            />
+                                        </td>
+                                        {COLUMNS.map(col => {
+                                            let val = customer[col.key] || '-';
+                                            if (col.key === 'added_at') {
+                                                val = new Date(customer.addedAt || customer.added_at || Date.now()).toLocaleDateString();
+                                            } else if (col.key === 'website' && customer.website) {
+                                                val = <a href={customer.website} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#0ea5e9' }}>{customer.website}</a>;
+                                            } else if (col.key === 'sns_x' && customer.sns_x) {
+                                                val = <a href={customer.sns_x.startsWith('http') ? customer.sns_x : `https://x.com/${customer.sns_x}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#0ea5e9' }}>{customer.sns_x}</a>;
+                                            } else if (col.key === 'exchanger' && customer.exchanger && customer.exchanger !== '-') {
+                                                val = <span style={{ ...getChipStyleForExchanger(customer.exchanger), padding: '4px 10px', borderRadius: '16px', fontSize: '12px', fontWeight: 'bold', display: 'inline-block' }}>{customer.exchanger}</span>;
                                             }
-                                        }}><Trash size={16} /></button>
-                                    </td>
-                                </tr>
-                            ))
+
+                                            const isStickyX = col.key === 'exchanger' || col.key === 'name';
+                                            const left = col.key === 'exchanger' ? '60px' : col.key === 'name' ? '200px' : undefined;
+
+                                            return (
+                                                <td key={col.key} style={{ minWidth: col.width, maxWidth: col.width, position: isStickyX ? 'sticky' : undefined, left: left, background: isStickyX ? rowBg : undefined, zIndex: isStickyX ? 20 : undefined, boxShadow: isStickyX && col.key === 'name' ? '4px 0 6px -2px rgba(0,0,0,0.05)' : undefined }}>
+                                                    <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: col.width }} title={String(customer[col.key] || '')}>
+                                                        {val}
+                                                    </div>
+                                                </td>
+                                            );
+                                        })}
+                                        <td style={{ position: 'sticky', right: 0, background: rowBg, zIndex: 10, paddingRight: '1rem' }} onClick={e => e.stopPropagation()}>
+                                            <button className="icon-btn danger" onClick={async () => {
+                                                if (window.confirm('この連絡先を削除しますか？')) {
+                                                    await fetch(`/api/customers/${customer.id}`, { method: 'DELETE' });
+                                                    fetchCustomers();
+                                                }
+                                            }}><Trash size={16} /></button>
+                                        </td>
+                                    </tr>
+                                );
+                            })
                         )}
                     </tbody>
                 </table>
