@@ -393,9 +393,9 @@ const CustomerDetail = () => {
                         <div className="card-preview" style={{ backgroundColor: 'var(--surface-color-2)', padding: '10px', borderRadius: '12px' }}>
                             {customer.image_url ? (
                                 customer.image_url.toLowerCase().endsWith('.pdf') ? (
-                                    <embed src={`/api/image/${encodeURIComponent(customer.image_url)}`} type="application/pdf" width="100%" height="400px" style={{ border: 'none', borderRadius: '8px' }} />
+                                    <embed src={customer.image_url} type="application/pdf" width="100%" height="400px" style={{ border: 'none', borderRadius: '8px' }} />
                                 ) : (
-                                    <img src={`/api/image/${encodeURIComponent(customer.image_url)}`} alt="Business Card" style={{ width: '100%', borderRadius: '8px', objectFit: 'contain' }} />
+                                    <img src={customer.image_url} alt="Business Card" style={{ width: '100%', borderRadius: '8px', objectFit: 'contain' }} />
                                 )
                             ) : (
                                 <div className="text-muted text-center" style={{ padding: '2rem' }}>画像がありません</div>
