@@ -12,6 +12,29 @@ interface SyncLog {
     errorMsg?: string;
 }
 
+const getHash = (str: string) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash);
+};
+
+const getRowStyleForExchanger = (exchanger?: string) => {
+    if (!exchanger || exchanger === '-') return undefined;
+    const h = getHash(exchanger) % 360;
+    return `hsl(${h}, 60%, 95%)`;
+};
+
+const getChipStyleForExchanger = (exchanger?: string) => {
+    if (!exchanger || exchanger === '-') return { background: '#f1f5f9', color: '#64748b' };
+    const h = getHash(exchanger) % 360;
+    return {
+        background: `hsl(${h}, 70%, 85%)`,
+        color: `hsl(${h}, 80%, 25%)`
+    };
+};
+
 const Dashboard = () => {
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
@@ -532,7 +555,7 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                             <tr><td colSpan={COLUMNS.length + 2} style={{ textAlign: 'center', padding: '40px' }}><span className="text-muted">データが見つかりません。</span></td></tr>
                         ) : (
                             filteredCustomers.map((customer: any) => (
-                                <tr key={customer.id} onClick={() => navigate(`/customer/${customer.id}`)} className="clickable-row">
+                                <tr key={customer.id} onClick={() => navigate(`/customer/${customer.id}`)} className="clickable-row" style={{ backgroundColor: getRowStyleForExchanger(customer.exchanger) }}>
                                     <td onClick={e => e.stopPropagation()} style={{ paddingLeft: '1.5rem', position: 'sticky', left: 0, background: 'inherit', zIndex: 5 }}>
                                         <input
                                             type="checkbox"
@@ -554,6 +577,8 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                                             val = <a href={customer.website} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#0ea5e9' }}>{customer.website}</a>;
                                         } else if (col.key === 'sns_x' && customer.sns_x) {
                                             val = <a href={customer.sns_x.startsWith('http') ? customer.sns_x : `https://x.com/${customer.sns_x}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#0ea5e9' }}>{customer.sns_x}</a>;
+                                        } else if (col.key === 'exchanger' && customer.exchanger && customer.exchanger !== '-') {
+                                            val = <span style={{ ...getChipStyleForExchanger(customer.exchanger), padding: '4px 10px', borderRadius: '16px', fontSize: '12px', fontWeight: 'bold', display: 'inline-block' }}>{customer.exchanger}</span>;
                                         }
                                         return (
                                             <td key={col.key}>
