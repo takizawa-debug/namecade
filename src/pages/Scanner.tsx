@@ -1,46 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, Save, FileText, ArrowRight, Loader, Cloud } from 'lucide-react';
+import { CheckCircle, Cloud, Loader, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import './Scanner.css';
 
-interface ScanItem {
-    id: number;
-    file_name: string;
-    image_url: string;
-    status: 'pending' | 'completed' | 'error';
-    customer_id?: number;
-    created_at: string;
+interface SyncLog {
+    id: string;
+    fileName: string;
+    mimeType: string;
+    status: 'pending' | 'downloading' | 'parsing' | 'saving' | 'completed' | 'error';
+    result?: any;
+    errorMsg?: string;
 }
 
 const Scanner: React.FC = () => {
     const navigate = useNavigate();
-    const [scans, setScans] = useState<ScanItem[]>([]);
-    const [loadingLibrary, setLoadingLibrary] = useState(true);
     const [syncing, setSyncing] = useState(false);
-    const [mode, setMode] = useState<'library' | 'parsing'>('library');
-
-    // Parsing state
-    const [currentParseScan, setCurrentParseScan] = useState<ScanItem | null>(null);
-    const [isScanning, setIsScanning] = useState(false);
-    const [scanResult, setScanResult] = useState<any | null>(null);
+    const [logs, setLogs] = useState<SyncLog[]>([]);
     const [existingCompanies, setExistingCompanies] = useState<string[]>([]);
+    const [progressStats, setProgressStats] = useState({ total: 0, current: 0 });
 
     useEffect(() => {
-        fetchLibrary();
         fetchExistingCompanies();
     }, []);
-
-    const fetchLibrary = async () => {
-        try {
-            const res = await fetch('/api/scans');
-            const data = await res.json();
-            setScans(data);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoadingLibrary(false);
-        }
-    };
 
     const fetchExistingCompanies = async () => {
         try {
@@ -53,45 +34,77 @@ const Scanner: React.FC = () => {
         }
     };
 
-    const handleDriveSync = async () => {
-        setSyncing(true);
-        try {
-            // Future implementation: call /api/sync-drive
-            const res = await fetch('/api/sync-drive', { method: 'POST' });
-            if (!res.ok) {
-                const error = await res.text();
-                // Check if it's 404 (not implemented yet)
-                if (res.status === 404) {
-                    alert("Google Driveの同期バックエンドがまだ設定されていません。");
-                } else {
-                    throw new Error(error);
-                }
-            } else {
-                const data = await res.json();
-                await fetchLibrary();
-                alert(`Google Driveと同期しました。\n新しい名刺を ${data.processed}件 読み込みました。`);
-            }
-        } catch (error) {
-            console.error("Drive sync failed", error);
-            alert("同期中にエラーが発生しました。Google Cloudの設定を確認してください。");
-        } finally {
-            setSyncing(false);
-        }
+    const toBase64 = (blob: Blob): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onload = () => {
+                const result = reader.result as string;
+                resolve(result.split(',')[1]);
+            };
+            reader.onerror = error => reject(error);
+        });
     };
 
-    const startParsing = async (scan: ScanItem) => {
-        setCurrentParseScan(scan);
-        setMode('parsing');
-        setIsScanning(true);
-        setScanResult(null);
+    const updateLog = (id: string, updates: Partial<SyncLog>) => {
+        setLogs(prev => prev.map(log => log.id === id ? { ...log, ...updates } : log));
+    };
+
+    const handleDriveSync = async () => {
+        if (syncing) return;
+        setSyncing(true);
+        setLogs([]);
+        setProgressStats({ total: 0, current: 0 });
 
         try {
-            // Fetch the image to get base64
-            const imgRes = await fetch(scan.image_url);
-            const blob = await imgRes.blob();
-            const base64Data = await toBase64(blob);
+            // 1. Get List of files
+            const listRes = await fetch('/api/drive/list');
+            if (!listRes.ok) throw new Error(await listRes.text());
+            const listData = await listRes.json();
 
-            const promptText = `あなたはプロフェッショナルな名刺情報抽出・分析アシスタントです。提供された名刺画像（表裏両面が含まれている場合もあります）から、以下の情報を日本語を最優先して極めて高い精度で抽出し、指定されたJSON構造のみを出力してください。
+            if (!listData.success) throw new Error(listData.error);
+
+            const files = listData.files || [];
+            if (files.length === 0) {
+                alert("Googleドライブの未登録フォルダにファイルがありません。");
+                setSyncing(false);
+                return;
+            }
+
+            const initialLogs: SyncLog[] = files.map((f: any) => ({
+                id: f.id,
+                fileName: f.name,
+                mimeType: f.mimeType,
+                status: 'pending'
+            }));
+            setLogs(initialLogs);
+            setProgressStats({ total: files.length, current: 0 });
+
+            // 2. Process each file one by one
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                setProgressStats(prev => ({ ...prev, current: i + 1 }));
+
+                try {
+                    // Download
+                    updateLog(file.id, { status: 'downloading' });
+                    const dlRes = await fetch('/api/drive/download', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fileId: file.id, fileName: file.name, mimeType: file.mimeType })
+                    });
+                    if (!dlRes.ok) throw new Error(await dlRes.text());
+                    const dlData = await dlRes.json();
+                    if (!dlData.success) throw new Error(dlData.error);
+
+                    // Fetch blob and convert to base64
+                    const imgRes = await fetch(dlData.url);
+                    const blob = await imgRes.blob();
+                    const base64Data = await toBase64(blob);
+
+                    // Parse
+                    updateLog(file.id, { status: 'parsing' });
+                    const promptText = `あなたはプロフェッショナルな名刺情報抽出・分析アシスタントです。提供された名刺画像（表裏両面が含まれている場合もあります）から、以下の情報を日本語を最優先して極めて高い精度で抽出し、指定されたJSON構造のみを出力してください。
 
 抽出と同時に、取得した総合的な情報から、相手がどのような組織・業種に属しているか、どのような役立つ接点（ビジネスチャンスなど）が持てそうか等について「AI分析コメント（150文字程度）」を作成し、\`aiAnalysis\`フィールドに格納してください。裏面の情報も加味してください。WEBサイトのURLやQRコード等があればそれも抽出してください。
 
@@ -135,295 +148,132 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
 - AI分析コメントは、名刺から得られた「客観的な事実（業種・部署・役職など）」のみから推測される、どのようなビジネスの接点になり得るかという簡潔なコメントを100文字程度で記述してください。
 - JSONフォーマット以外（説明テキストや\`\`\`jsonなどのマークダウン）は一切出力しないでください。`;
 
-            let mimeType = blob.type;
-            const ext = scan.file_name.toLowerCase().split('.').pop();
-            if (ext === 'pdf') mimeType = 'application/pdf';
-            else if (ext === 'png') mimeType = 'image/png';
-            else if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
-            else if (!mimeType || mimeType === 'application/octet-stream') mimeType = 'image/jpeg';
+                    const parseRes = await fetch('/api/parse', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: promptText, base64Data, mimeType: dlData.mimeType })
+                    });
 
-            const response = await fetch(`/api/parse`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: promptText, base64Data, mimeType })
-            });
+                    if (!parseRes.ok) throw new Error(await parseRes.text());
+                    const parseData = await parseRes.json();
+                    if (!parseData.success) {
+                        // Error code handling
+                        if (parseData.error && parseData.error.includes && parseData.error.includes("leaked")) {
+                            throw new Error("Gemini APIキーが無効化されています。別のキーを使用してください。");
+                        }
+                        throw new Error(parseData.error);
+                    }
+                    const extracted = parseData.data;
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`API error ${response.status}: ${errorText}`);
+                    updateLog(file.id, { status: 'saving', result: extracted });
+
+                    const customerData = {
+                        ...extracted,
+                        imageUrl: dlData.url
+                    };
+                    const saveRes = await fetch('/api/customers', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(customerData)
+                    });
+                    if (!saveRes.ok) throw new Error("Failed to save customer");
+
+                    await fetch('/api/drive/move', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fileId: file.id })
+                    });
+
+                    updateLog(file.id, { status: 'completed' });
+
+                    if (extracted.company && !existingCompanies.includes(extracted.company)) {
+                        setExistingCompanies([...existingCompanies, extracted.company]);
+                    }
+
+                } catch (err: any) {
+                    console.error("File processing failed: ", file.name, err);
+                    updateLog(file.id, { status: 'error', errorMsg: err.message || String(err) });
+                }
             }
 
-            const data = await response.json();
-            if (data.success) {
-                setScanResult(data.data);
-            } else {
-                throw new Error(data.error || "No data returned from AI.");
-            }
+            alert("Google Driveの同期・解析が完了しました！");
+
         } catch (error) {
-            console.error("Scanning failed", error);
-            alert("Failed to extract data: " + (error as Error).message);
+            console.error("Drive list failed", error);
+            alert("同期中にエラーが発生しました。\n" + (error as Error).message);
         } finally {
-            setIsScanning(false);
+            setSyncing(false);
         }
     };
 
-    const toBase64 = (blob: Blob): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(blob);
-            reader.onload = () => {
-                const result = reader.result as string;
-                resolve(result.split(',')[1]);
-            };
-            reader.onerror = error => reject(error);
-        });
-    };
-
-    const handleSaveParsed = async () => {
-        if (!scanResult || !currentParseScan) return;
-
-        try {
-            const customerData = {
-                ...scanResult,
-                imageUrl: currentParseScan.file_name // Save the file_name as imageUrl in customer db
-            };
-
-            const response = await fetch('/api/customers', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(customerData)
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-
-                // Update scan status to completed
-                await fetch(`/api/scans/${currentParseScan.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: 'completed', customer_id: data.id })
-                });
-
-                setMode('library');
-                fetchLibrary(); // refresh
-            } else {
-                alert('連絡先の保存に失敗しました。');
-            }
-        } catch (error) {
-            console.error("Save failed", error);
-            alert("エラーが発生しました。");
+    const getStatusBadge = (status: SyncLog['status']) => {
+        switch (status) {
+            case 'pending': return <span className="status-badge pending">待機中</span>;
+            case 'downloading': return <span className="status-badge" style={{ background: '#e0f2fe', color: '#0369a1' }}><Loader size={12} className="spin" style={{ marginRight: '4px' }} /> ダウンロード</span>;
+            case 'parsing': return <span className="status-badge" style={{ background: '#fef08a', color: '#854d0e' }}><Loader size={12} className="spin" style={{ marginRight: '4px' }} /> 解析中</span>;
+            case 'saving': return <span className="status-badge" style={{ background: '#dcfce7', color: '#166534' }}><Loader size={12} className="spin" style={{ marginRight: '4px' }} /> 保存中</span>;
+            case 'completed': return <span className="status-badge completed"><CheckCircle size={12} style={{ marginRight: '4px' }} /> 完了</span>;
+            case 'error': return <span className="status-badge" style={{ background: '#fee2e2', color: '#991b1b' }}><AlertCircle size={12} style={{ marginRight: '4px' }} /> エラー</span>;
         }
     };
 
-    const deleteScan = async (id: number) => {
-        if (!window.confirm("このスキャンを削除してもよろしいですか？")) return;
-        await fetch(`/api/scans/${id}`, { method: 'DELETE' });
-        fetchLibrary();
-    };
-
-
-    if (mode === 'parsing' && currentParseScan) {
-        return (
-            <div className="scanner-page animate-fade-in">
-                <header className="page-header sticky-header">
-                    <div>
-                        <h2>名刺解析</h2>
-                        <p className="subtitle">AIが抽出した内容を確認・修正して保存してください</p>
-                    </div>
-                    <button className="btn-secondary" onClick={() => setMode('library')}>ライブラリに戻る</button>
-                </header>
-
-                <div className="scanner-layout">
-                    <div className="card upload-section" style={{ alignSelf: 'start', position: 'sticky', top: '100px' }}>
-                        <h3>元画像</h3>
-                        <div className="image-preview" style={{ marginTop: '16px' }}>
-                            {currentParseScan.image_url.endsWith('.pdf') ? (
-                                <embed src={currentParseScan.image_url} type="application/pdf" width="100%" height="400px" style={{ borderRadius: '8px' }} />
-                            ) : (
-                                <img src={currentParseScan.image_url} alt="Scan preview" />
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="card result-section">
-                        <h3>抽出情報</h3>
-                        {isScanning && (
-                            <div className="scanning-state">
-                                <div className="scan-loader"></div>
-                                <p>AIで情報を抽出中...</p>
-                            </div>
-                        )}
-
-                        {scanResult && !isScanning && (
-                            <div className="extracted-data animate-fade-in">
-                                <div className="success-banner">
-                                    <CheckCircle size={20} className="icon-success" />
-                                    <span>解析完了。内容を修正し保存してください。</span>
-                                </div>
-
-                                <div className="form-grid">
-                                    <div className="input-group">
-                                        <span className="input-label">氏名</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.name} onChange={(e) => setScanResult({ ...scanResult, name: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">氏名（ローマ字）</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.name_romaji || ''} onChange={(e) => setScanResult({ ...scanResult, name_romaji: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">会社名</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.company} onChange={(e) => setScanResult({ ...scanResult, company: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">部署</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.department || ''} onChange={(e) => setScanResult({ ...scanResult, department: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">役職</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.role} onChange={(e) => setScanResult({ ...scanResult, role: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">メールアドレス</span>
-                                        <input type="email" className="input-field" defaultValue={scanResult.email} onChange={(e) => setScanResult({ ...scanResult, email: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">固定電話</span>
-                                        <input type="tel" className="input-field" defaultValue={scanResult.phone} onChange={(e) => setScanResult({ ...scanResult, phone: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">携帯電話</span>
-                                        <input type="tel" className="input-field" defaultValue={scanResult.phone_mobile || ''} onChange={(e) => setScanResult({ ...scanResult, phone_mobile: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">FAX</span>
-                                        <input type="tel" className="input-field" defaultValue={scanResult.fax || ''} onChange={(e) => setScanResult({ ...scanResult, fax: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">郵便番号</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.postal_code || ''} onChange={(e) => setScanResult({ ...scanResult, postal_code: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">都道府県</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.prefecture || ''} onChange={(e) => setScanResult({ ...scanResult, prefecture: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">市区町村</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.city || ''} onChange={(e) => setScanResult({ ...scanResult, city: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">番地</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.address_line1 || ''} onChange={(e) => setScanResult({ ...scanResult, address_line1: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">建物名・階</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.address_line2 || ''} onChange={(e) => setScanResult({ ...scanResult, address_line2: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">WEBサイト</span>
-                                        <input type="url" className="input-field" defaultValue={scanResult.website} onChange={(e) => setScanResult({ ...scanResult, website: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">X(Twitter)</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.sns_x || ''} onChange={(e) => setScanResult({ ...scanResult, sns_x: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">Facebook</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.sns_facebook || ''} onChange={(e) => setScanResult({ ...scanResult, sns_facebook: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">Instagram</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.sns_instagram || ''} onChange={(e) => setScanResult({ ...scanResult, sns_instagram: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">LinkedIn</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.sns_linkedin || ''} onChange={(e) => setScanResult({ ...scanResult, sns_linkedin: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <span className="input-label">その他のSNS</span>
-                                        <input type="text" className="input-field" defaultValue={scanResult.sns_other || ''} onChange={(e) => setScanResult({ ...scanResult, sns_other: e.target.value })} />
-                                    </div>
-                                    <div className="input-group" style={{ gridColumn: '1 / -1' }}>
-                                        <span className="input-label">AI分析コメント</span>
-                                        <textarea
-                                            className="input-field"
-                                            rows={3}
-                                            defaultValue={scanResult.aiAnalysis}
-                                            onChange={(e) => setScanResult({ ...scanResult, aiAnalysis: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="action-row">
-                                    <button className="btn-secondary" onClick={() => setMode('library')}>キャンセル</button>
-                                    <button className="btn-primary" onClick={handleSaveParsed}>
-                                        <Save size={18} /> 名刺リストに保存
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // mode === 'library'
     return (
         <div className="scanner-page animate-fade-in">
             <header className="page-header sticky-header">
                 <div>
-                    <h2>スキャンライブラリ</h2>
-                    <p className="subtitle">撮影・アップロードした名刺の一括管理</p>
+                    <h2>名刺自動解析ダッシュボード</h2>
+                    <p className="subtitle">Googleドライブから名刺を同期し、全自動で解析・登録を行います。</p>
                 </div>
                 <div style={{ display: 'flex', gap: '12px' }}>
                     <button className="btn-primary" onClick={handleDriveSync} disabled={syncing} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {syncing ? <Loader size={18} className="spin" /> : <Cloud size={18} />}
-                        Googleドライブから同期
+                        {syncing ? `同期中 (${progressStats.current}/${progressStats.total})` : 'Googleドライブと同期'}
+                    </button>
+                    <button className="btn-secondary" onClick={() => navigate('/')} disabled={syncing}>
+                        一覧に戻る
                     </button>
                 </div>
             </header>
 
-            <div className="library-content">
-                {loadingLibrary ? (
-                    <div className="empty-state">読み込み中...</div>
-                ) : scans.length === 0 ? (
+            <div className="library-content" style={{ marginTop: '20px' }}>
+                {logs.length === 0 ? (
                     <div className="empty-state card">
-                        <FileText size={48} style={{ opacity: 0.2, marginBottom: '20px' }} />
-                        <p>スキャンされた名刺がありません。画像を追加してください。</p>
+                        <Cloud size={48} style={{ opacity: 0.2, marginBottom: '20px' }} />
+                        <p>ボタンを押すとGoogleドライブの解析を開始します。</p>
                     </div>
                 ) : (
-                    <div className="scan-grid">
-                        {scans.map(scan => (
-                            <div key={scan.id} className={`scan-card ${scan.status}`}>
-                                <div className="scan-thumbnail">
-                                    {scan.image_url.endsWith('.pdf') ? (
-                                        <div className="pdf-placeholder"><FileText size={32} /></div>
-                                    ) : (
-                                        <img src={scan.image_url} alt="Scan thumbnail" />
-                                    )}
-                                    <span className={`status-badge ${scan.status}`}>
-                                        {scan.status === 'pending' ? '未解析' : '登録済み'}
-                                    </span>
-                                </div>
-                                <div className="scan-actions">
-                                    <span className="file-date">{new Date(scan.created_at).toLocaleDateString()}</span>
-                                    {scan.status === 'pending' ? (
-                                        <button className="btn-primary btn-sm" onClick={() => startParsing(scan)}>
-                                            解析する <ArrowRight size={14} />
-                                        </button>
-                                    ) : (
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            <button className="btn-secondary btn-sm" onClick={() => navigate(`/customer/${scan.customer_id}`)}>
-                                                詳細を開く
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="scan-delete">
-                                    <button className="btn-icon text-muted" onClick={() => deleteScan(scan.id)}>🗑️</button>
-                                </div>
-                            </div>
-                        ))}
+                    <div className="sync-logs-container card">
+                        <h3>解析ログ</h3>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '16px', textAlign: 'left' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                    <th style={{ padding: '12px 8px', color: '#64748b', fontSize: '13px' }}>ファイル名</th>
+                                    <th style={{ padding: '12px 8px', color: '#64748b', fontSize: '13px', width: '120px' }}>ステータス</th>
+                                    <th style={{ padding: '12px 8px', color: '#64748b', fontSize: '13px' }}>抽出結果</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {logs.map(log => (
+                                    <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                        <td style={{ padding: '12px 8px', fontSize: '14px', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            {log.fileName}
+                                        </td>
+                                        <td style={{ padding: '12px 8px' }}>{getStatusBadge(log.status)}</td>
+                                        <td style={{ padding: '12px 8px', fontSize: '14px', color: '#334155' }}>
+                                            {log.status === 'error' ? (
+                                                <span style={{ color: '#ef4444' }}>{log.errorMsg}</span>
+                                            ) : log.result ? (
+                                                <span>
+                                                    <strong>{log.result.company}</strong> {log.result.name}
+                                                </span>
+                                            ) : (
+                                                <span style={{ color: '#cbd5e1' }}>待機中</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </div>
