@@ -164,8 +164,15 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
 - AI分析コメントは、名刺から得られた「客観的な事実（業種・部署・役職など）」のみから推測される、どのようなビジネスの接点になり得るかという簡潔なコメントを100文字程度で記述してください。
 - JSONフォーマット以外（説明テキストや\`\`\`jsonなどのマークダウン）は一切出力しないでください。`;
 
+            let mimeType = blob.type;
+            const ext = scan.file_name.toLowerCase().split('.').pop();
+            if (ext === 'pdf') mimeType = 'application/pdf';
+            else if (ext === 'png') mimeType = 'image/png';
+            else if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
+            else if (!mimeType || mimeType === 'application/octet-stream') mimeType = 'image/jpeg';
+
             const payload = {
-                contents: [{ parts: [{ text: promptText }, { inline_data: { mime_type: blob.type, data: base64Data } }] }],
+                contents: [{ parts: [{ text: promptText }, { inline_data: { mime_type: mimeType, data: base64Data } }] }],
                 generationConfig: { temperature: 0.0 }
             };
 
@@ -175,7 +182,10 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                 body: JSON.stringify(payload)
             });
 
-            if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`API error ${response.status}: ${errorText}`);
+            }
 
             const data = await response.json();
             const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;

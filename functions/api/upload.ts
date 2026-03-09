@@ -6,13 +6,16 @@ interface Env {
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
     try {
-        const filename = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+        const contentType = context.request.headers.get('Content-Type') || 'image/jpeg';
+        const isPdf = contentType === 'application/pdf';
+        const extension = isPdf ? '.pdf' : '.jpg';
+        const filename = `${Date.now()}_${Math.random().toString(36).substring(7)}${extension}`;
 
         // Read the binary stream from the request
         const fileStream = await context.request.arrayBuffer();
 
         await context.env.BUCKET.put(filename, fileStream, {
-            httpMetadata: { contentType: 'image/jpeg' },
+            httpMetadata: { contentType },
         });
 
         const publicUrl = `/api/image/${filename}`;
