@@ -58,7 +58,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             fields: 'files(id, name, mimeType)',
             pageSize: '50',
             includeItemsFromAllDrives: 'true',
-            supportsAllDrives: 'true'
+            supportsAllDrives: 'true',
+            corpora: 'allDrives'
         });
 
         const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?${listQuery.toString()}`, {
@@ -125,6 +126,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
     } catch (error) {
         console.error(error);
-        return Response.json({ success: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+        const errObj = {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+        };
+        return Response.json({ success: false, error: errObj }, { status: 500 });
     }
 };
