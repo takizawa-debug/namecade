@@ -81,20 +81,33 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             })
         });
 
-        if (!copyRes.ok) throw new Error(`Copy failed: ${await copyRes.text()}`);
+        if (!copyRes.ok) {
+            const errText = await copyRes.text();
+            throw new Error(`ファイルを「完了済」フォルダへコピーできませんでした: ${errText}`);
+        }
 
-        // 2. Delete the original file
-        const deleteRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {
-            method: 'DELETE',
+        // 2. Trash the original file instead of hard delete
+        // Content Managers in Shared Drives can only trash files, not permanently delete them (which DELETE does).
+        const trashRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {
+            method: 'PATCH',
             headers: {
-                'Authorization': `Bearer ${accessToken}`
-            }
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                trashed: true
+            })
         });
 
-        if (!deleteRes.ok) throw new Error(`Delete failed: ${await deleteRes.text()}`);
+        if (!trashRes.ok) {
+            const errText = await trashRes.text();
+            // If trashing fails with 404 or something, we shouldn't completely fail the move since copy succeeded.
+            // But we will throw a readable error so the user knows.
+            throw new Error(`コピーは成功しましたが、元の「未登録」ファイルのゴミ箱移動に失敗しました (手動で削除してください): ${errText}`);
+        }
 
         return Response.json({ success: true });
     } catch (e) {
-        return Response.json({ success: false, error: String(e) }, { status: 500 });
+        return Response.json({ success: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 });
     }
 };
