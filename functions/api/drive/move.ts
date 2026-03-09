@@ -50,9 +50,21 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         const { fileId } = await context.request.json() as any;
         const accessToken = await getAccessToken(context.env);
 
+        const getRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=parents&supportsAllDrives=true`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        let currentParents = SOURCE_FOLDER_ID;
+        if (getRes.ok) {
+            const data = await getRes.json() as any;
+            if (data.parents && data.parents.length > 0) {
+                currentParents = data.parents.join(',');
+            }
+        }
+
         const moveQuery = new URLSearchParams({
             addParents: DEST_FOLDER_ID,
-            removeParents: SOURCE_FOLDER_ID,
+            removeParents: currentParents,
             supportsAllDrives: 'true'
         });
 
