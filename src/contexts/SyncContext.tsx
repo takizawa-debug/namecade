@@ -42,6 +42,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // We keep existingCompanies just like Dashboard did, to feed into AI
     const [existingCompanies, setExistingCompanies] = useState<string[]>([]);
     const wakeLockRef = useRef<any>(null);
+    const isSyncingRef = useRef(false);
 
     // Prevent device sleep during sync using Screen Wake Lock API
     useEffect(() => {
@@ -119,7 +120,8 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleDriveSync = () => startOrResumeSync(false, null);
 
     const startOrResumeSync = async (isResume = false, savedState: any = null) => {
-        if (syncing) return;
+        if (isSyncingRef.current) return;
+        isSyncingRef.current = true;
         setSyncing(true);
         setShowSyncPanel(true);
 
@@ -127,7 +129,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let hasCheckedAtLeastOnce = false;
 
         try {
-            while (true) {
+            while (isSyncingRef.current) {
                 let currentState: any;
                 if (isResume && savedState) {
                     currentState = savedState;
@@ -172,6 +174,8 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
 
                 for (let i = currentState.currentIndex; i < currentState.files.length; i++) {
+                    if (!isSyncingRef.current) break;
+
                     currentState.currentIndex = i;
                     sessionStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
 
@@ -192,18 +196,30 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                     try {
                         // Try to claim file lock for parallel processing
-                        const claimRes = await fetch('/api/drive/claim', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ fileId: file.id })
-                        });
-                        const claimData = await claimRes.json();
+                        let claimed = false;
+                        try {
+                            const claimRes = await fetch('/api/drive/claim', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ fileId: file.id })
+                            });
+                            if (claimRes.ok) {
+                                const claimData = await claimRes.json();
+                                if (claimData.success && claimData.claimed) {
+                                    claimed = true;
+                                }
+                            }
+                        } catch (err) {
+                            console.error("Lock error", err);
+                        }
 
-                        if (claimRes.ok && claimData.success === false && claimData.claimed === false) {
-                            console.log(`File ${file.name} is already claimed by another tab/session. Skipping.`);
+                        if (!claimed) {
+                            console.log(`File ${file.name} is already claimed by another tab/session or lock failed. Skipping.`);
                             updateLogLocal('skipped', { errorMsg: '別プロセスで処理中' });
                             continue;
                         }
+
+                        if (!isSyncingRef.current) break;
 
                         updateLogLocal('downloading');
                         const dlRes = await fetch('/api/drive/download', {
@@ -352,6 +368,7 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
             console.error("Drive sync failed", error);
             alert("同期中にエラーが発生しました。\n" + (error as Error).message);
         } finally {
+            isSyncingRef.current = false;
             setSyncing(false);
         }
     };
@@ -365,6 +382,7 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                         <h3 style={{ margin: 0, fontSize: 16 }}>クラウド同期・自動解析状況</h3>
                         <button className="btn-secondary btn-sm" onClick={() => {
+                            isSyncingRef.current = false;
                             setSyncing(false);
                             setShowSyncPanel(false);
                             sessionStorage.removeItem('namecard_sync_state');
