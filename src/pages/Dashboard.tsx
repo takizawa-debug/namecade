@@ -178,8 +178,9 @@ const Dashboard = () => {
 
                 const isNameMatch = a.name && b.name && a.name === b.name;
                 const isRomajiMatch = a.name_romaji && b.name_romaji && a.name_romaji === b.name_romaji;
+                const isCompanyMatch = a.company && b.company && a.company === b.company;
 
-                if (isNameMatch || isRomajiMatch) {
+                if ((isNameMatch || isRomajiMatch) && isCompanyMatch) {
                     dups.add(a.id);
                     dups.add(b.id);
                 }
@@ -278,7 +279,7 @@ const Dashboard = () => {
                             display: 'flex', alignItems: 'center', gap: '6px'
                         }}
                         onClick={() => setShowDuplicatesOnly(!showDuplicatesOnly)}
-                        title="氏名または氏名(ローマ字)が重複している名刺を抽出します"
+                        title="氏名または氏名(ローマ字)が一致し、かつ会社名が一致している名刺を抽出します"
                     >
                         フィルター: 重複疑いのみ
                     </button>
