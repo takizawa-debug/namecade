@@ -50,11 +50,23 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         const { fileId, newName } = await context.request.json() as any;
         const accessToken = await getAccessToken(context.env);
 
-        // 1. Move the file from the SOURCE folder to the DEST folder
+        // 1. Get the current parents of the file so we can remove them
+        const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=parents&supportsAllDrives=true`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (!fileRes.ok) {
+            throw new Error(`ファイル情報の取得に失敗しました: ${await fileRes.text()}`);
+        }
+        const fileData = await fileRes.json() as { parents?: string[] };
+        const currentParents = fileData.parents ? fileData.parents.join(',') : '';
+
+        // 2. Move the file from the current folder to the DEST folder
         // For Shared Drives, moving files within the same shared drive is allowed using PATCH.
         const patchUrl = new URL(`https://www.googleapis.com/drive/v3/files/${fileId}`);
         patchUrl.searchParams.set('addParents', DEST_FOLDER_ID);
-        patchUrl.searchParams.set('removeParents', SOURCE_FOLDER_ID);
+        if (currentParents) {
+            patchUrl.searchParams.set('removeParents', currentParents);
+        }
         patchUrl.searchParams.set('supportsAllDrives', 'true');
 
         const moveBody = newName ? { name: newName } : undefined;
