@@ -43,6 +43,7 @@ const Dashboard = () => {
     const [bulkEditData, setBulkEditData] = useState({ business_category: '', tags: '', exchanger: '', added_at: '' });
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editData, setEditData] = useState<any>({});
+    const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
     const syncContextObj = useContext(SyncContext);
     const { syncing, progressStats, latestProcessedTime, handleDriveSync, handleForceReset } = syncContextObj || {
         syncing: false,
@@ -168,6 +169,30 @@ const Dashboard = () => {
         }
     });
 
+    if (showDuplicatesOnly) {
+        const dups = new Set<number>();
+        for (let i = 0; i < resultCustomers.length; i++) {
+            for (let j = i + 1; j < resultCustomers.length; j++) {
+                const a = resultCustomers[i];
+                const b = resultCustomers[j];
+                let matchCount = 0;
+                if (a.name && a.name === b.name) matchCount++;
+                if (a.company && a.company === b.company) matchCount++;
+                if (a.email && a.email === b.email) matchCount++;
+                if (a.phone && a.phone === b.phone) matchCount++;
+                if (a.phone_mobile && a.phone_mobile === b.phone_mobile) matchCount++;
+                if (a.department && a.department === b.department) matchCount++;
+                if (a.role && a.role === b.role) matchCount++;
+
+                if (matchCount >= 3) {
+                    dups.add(a.id);
+                    dups.add(b.id);
+                }
+            }
+        }
+        resultCustomers = resultCustomers.filter(c => dups.has(c.id));
+    }
+
     if (sortConfig) {
         resultCustomers.sort((a, b) => {
             const valA = (a[sortConfig.key] || '').toString().toLowerCase();
@@ -238,7 +263,7 @@ const Dashboard = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                {selectedIds.length > 0 && (
+                {selectedIds.length > 0 ? (
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <button className="btn-secondary" style={{ color: '#0ea5e9', borderColor: '#e0f2fe', backgroundColor: '#f0f9ff' }} onClick={() => setShowBulkEdit(true)}>
                             一括編集
@@ -248,6 +273,20 @@ const Dashboard = () => {
                             {selectedIds.length}件を削除
                         </button>
                     </div>
+                ) : (
+                    <button
+                        className="btn-secondary"
+                        style={{
+                            color: showDuplicatesOnly ? '#b45309' : '#64748b',
+                            borderColor: showDuplicatesOnly ? '#fde68a' : '#e2e8f0',
+                            backgroundColor: showDuplicatesOnly ? '#fef3c7' : 'transparent',
+                            display: 'flex', alignItems: 'center', gap: '6px'
+                        }}
+                        onClick={() => setShowDuplicatesOnly(!showDuplicatesOnly)}
+                        title="内容が重複している可能性がある名刺（3項目以上一致）を抽出します"
+                    >
+                        フィルター: 重複疑いのみ
+                    </button>
                 )}
             </div>
 
