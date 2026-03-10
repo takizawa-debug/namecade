@@ -271,6 +271,12 @@ const Dashboard = () => {
                 </div>, document.body
             )}
 
+            <datalist id="exchanger-list">
+                {Array.from(new Set(customers.map((c: any) => c.exchanger).filter(Boolean))).map((exchanger: any, idx) => (
+                    <option key={idx} value={exchanger} />
+                ))}
+            </datalist>
+
             <div className="card table-container" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 220px)', paddingBottom: '1rem' }}>
                 <table className="data-table" style={{ minWidth: '2500px' }}>
                     <thead>
@@ -302,6 +308,7 @@ const Dashboard = () => {
                                         <input
                                             type="text"
                                             placeholder="絞り込み..."
+                                            list={col.key === 'exchanger' ? "exchanger-list" : undefined}
                                             value={filters[col.key] || ''}
                                             onClick={e => e.stopPropagation()}
                                             onChange={e => setFilters({ ...filters, [col.key]: e.target.value })}
