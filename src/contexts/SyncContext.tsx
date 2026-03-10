@@ -101,17 +101,17 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .catch(err => console.error(err));
 
         // Resume sync if there's a pending state
-        const savedSync = localStorage.getItem('namecard_sync_state');
+        const savedSync = sessionStorage.getItem('namecard_sync_state');
         if (savedSync) {
             try {
                 const state = JSON.parse(savedSync);
                 if (state && state.isRunning && state.files && state.currentIndex < state.files.length) {
                     startOrResumeSync(true, state);
                 } else {
-                    localStorage.removeItem('namecard_sync_state');
+                    sessionStorage.removeItem('namecard_sync_state');
                 }
             } catch (e) {
-                localStorage.removeItem('namecard_sync_state');
+                sessionStorage.removeItem('namecard_sync_state');
             }
         }
     }, []);
@@ -168,12 +168,12 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     currentState = { isRunning: true, files, logs: initialLogs, currentIndex: 0, newCustomersFound: false };
                     setLogs(initialLogs);
                     setProgressStats({ total: files.length, current: 0 });
-                    localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+                    sessionStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
                 }
 
                 for (let i = currentState.currentIndex; i < currentState.files.length; i++) {
                     currentState.currentIndex = i;
-                    localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+                    sessionStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
 
                     const file = currentState.files[i];
                     setProgressStats(prev => ({ ...prev, current: i + 1 }));
@@ -186,7 +186,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             currentLogs[idx] = { ...currentLogs[idx], status, ...extra };
                             setLogs([...currentLogs]);
                             currentState.logs = currentLogs;
-                            localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+                            sessionStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
                         }
                     };
 
@@ -339,10 +339,10 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
 
                 currentState.isRunning = false;
                 currentState.currentIndex = currentState.files.length;
-                localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+                sessionStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
 
                 setLatestProcessedTime(Date.now());
-                localStorage.removeItem('namecard_sync_state');
+                sessionStorage.removeItem('namecard_sync_state');
 
                 // Wait a moment for Drive moves to fully propagate before fetching the list again
                 await new Promise(resolve => setTimeout(resolve, 1500));
@@ -367,7 +367,7 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                         <button className="btn-secondary btn-sm" onClick={() => {
                             setSyncing(false);
                             setShowSyncPanel(false);
-                            localStorage.removeItem('namecard_sync_state');
+                            sessionStorage.removeItem('namecard_sync_state');
                         }}>
                             {syncing ? '停止・閉じる' : '閉じる'}
                         </button>
