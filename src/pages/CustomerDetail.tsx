@@ -393,7 +393,7 @@ const CustomerDetail = () => {
                         <div className="card-preview" style={{ backgroundColor: 'var(--surface-color-2)', padding: '10px', borderRadius: '12px' }}>
                             {customer.image_url ? (
                                 customer.image_url.toLowerCase().endsWith('.pdf') ? (
-                                    <embed src={customer.image_url} type="application/pdf" width="100%" height="400px" style={{ border: 'none', borderRadius: '8px' }} />
+                                    <embed src={`${customer.image_url}#toolbar=0&navpanes=0&scrollbar=0`} type="application/pdf" width="100%" height="400px" style={{ border: 'none', borderRadius: '8px', overflow: 'hidden' }} />
                                 ) : (
                                     <img src={customer.image_url} alt="Business Card" style={{ width: '100%', borderRadius: '8px', objectFit: 'contain' }} />
                                 )
