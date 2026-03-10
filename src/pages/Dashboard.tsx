@@ -74,6 +74,26 @@ const Dashboard = () => {
             });
     };
 
+    const handleRestoreSkipped = async () => {
+        if (!confirm('「完了済フォルダ」にあってシステムに登録されていない（スキップされた）名刺をすべて「未処理フォルダ」に戻します。よろしいですか？')) return;
+
+        try {
+            const res = await fetch('/api/drive/restore-skipped', { method: 'POST' });
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(errorText);
+            }
+            const data = await res.json();
+            if (data.success) {
+                alert(`処理が完了しました。${data.movedCount}件の名刺を未処理状態に戻しました。`);
+            } else {
+                throw new Error(data.error || '不明なエラー');
+            }
+        } catch (err: any) {
+            alert(`エラーが発生しました: ${err.message}`);
+        }
+    };
+
     const handleDeleteSelected = async () => {
         if (selectedIds.length === 0) return;
         if (!window.confirm(`${selectedIds.length}件の連絡先を削除しますか？`)) return;
@@ -238,6 +258,9 @@ const Dashboard = () => {
                     <p className="subtitle">名刺と顧客情報を管理・整理します</p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="btn-secondary" onClick={handleRestoreSkipped} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a', borderColor: '#dcfce3', backgroundColor: '#f0fdf4' }} title="スキップされた名刺を未登録フォルダに戻します">
+                        未処理へ戻す
+                    </button>
                     <button className="btn-secondary" onClick={handleForceReset} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', borderColor: '#fee2e2', backgroundColor: '#fef2f2' }} title="同期が止まらない場合やロックを強制解除します">
                         強制リセット
                     </button>
