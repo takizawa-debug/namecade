@@ -15,6 +15,7 @@ interface SyncContextType {
     progressStats: { total: number; current: number };
     latestProcessedTime: number;
     handleDriveSync: () => void;
+    handleForceReset: () => void;
     setShowSyncPanel: (show: boolean) => void;
 }
 
@@ -118,6 +119,24 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const handleDriveSync = () => startOrResumeSync(false, null);
+
+    const handleForceReset = async () => {
+        if (confirm('実行中のすべての同期を強制キャンセルし、システムロックを解除します。よろしいですか？')) {
+            isSyncingRef.current = false;
+            setSyncing(false);
+            setShowSyncPanel(false);
+            sessionStorage.removeItem('namecard_sync_state');
+            setLogs([]);
+            setProgressStats({ total: 0, current: 0 });
+            try {
+                await fetch('/api/drive/claim?fileId=all', { method: 'DELETE' });
+                alert('すべてのシステムロックと処理中の状態を強制リセットしました。');
+            } catch (err) {
+                console.error("Lock reset failed", err);
+                alert('リセット中にエラーが発生しました。');
+            }
+        }
+    };
 
     const startOrResumeSync = async (isResume = false, savedState: any = null) => {
         if (isSyncingRef.current) return;
@@ -379,7 +398,7 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
     };
 
     return (
-        <SyncContext.Provider value={{ syncing, showSyncPanel, logs, progressStats, latestProcessedTime, handleDriveSync, setShowSyncPanel }}>
+        <SyncContext.Provider value={{ syncing, showSyncPanel, logs, progressStats, latestProcessedTime, handleDriveSync, handleForceReset, setShowSyncPanel }}>
             {children}
 
             {showSyncPanel && (

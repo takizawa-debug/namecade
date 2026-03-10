@@ -44,8 +44,13 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
             return Response.json({ success: false, error: 'Missing fileId' }, { status: 400 });
         }
 
-        const stmt = context.env.DB.prepare('DELETE FROM file_locks WHERE file_id = ?').bind(fileId);
-        await stmt.run();
+        if (fileId === 'all') {
+            const stmt = context.env.DB.prepare('DELETE FROM file_locks');
+            await stmt.run();
+        } else {
+            const stmt = context.env.DB.prepare('DELETE FROM file_locks WHERE file_id = ?').bind(fileId);
+            await stmt.run();
+        }
 
         return Response.json({ success: true });
     } catch (error) {

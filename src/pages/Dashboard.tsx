@@ -44,7 +44,13 @@ const Dashboard = () => {
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editData, setEditData] = useState<any>({});
     const syncContextObj = useContext(SyncContext);
-    const { syncing, progressStats, latestProcessedTime, handleDriveSync } = syncContextObj || { syncing: false, progressStats: { total: 0, current: 0 }, latestProcessedTime: Date.now(), handleDriveSync: () => { } };
+    const { syncing, progressStats, latestProcessedTime, handleDriveSync, handleForceReset } = syncContextObj || {
+        syncing: false,
+        progressStats: { total: 0, current: 0 },
+        latestProcessedTime: Date.now(),
+        handleDriveSync: () => { },
+        handleForceReset: () => { }
+    };
 
     useEffect(() => {
         fetchCustomers();
@@ -210,10 +216,15 @@ const Dashboard = () => {
                     <h2>ダッシュボード</h2>
                     <p className="subtitle">名刺と顧客情報を管理・整理します</p>
                 </div>
-                <button className="btn-primary" onClick={handleDriveSync} disabled={syncing} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {syncing ? <Loader size={18} className="spin" /> : <Cloud size={18} />}
-                    {syncing ? `同期中 (${progressStats.current}/${progressStats.total})` : 'Googleドライブと同期'}
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="btn-secondary" onClick={handleForceReset} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', borderColor: '#fee2e2', backgroundColor: '#fef2f2' }} title="同期が止まらない場合やロックを強制解除します">
+                        強制リセット
+                    </button>
+                    <button className="btn-primary" onClick={handleDriveSync} disabled={syncing} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {syncing ? <Loader size={18} className="spin" /> : <Cloud size={18} />}
+                        {syncing ? `同期中 (${progressStats.current}/${progressStats.total})` : 'Googleドライブと同期'}
+                    </button>
+                </div>
             </header>
 
             {/* Sync Overlay logic moved to SyncContext */}
