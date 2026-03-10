@@ -175,16 +175,11 @@ const Dashboard = () => {
             for (let j = i + 1; j < resultCustomers.length; j++) {
                 const a = resultCustomers[i];
                 const b = resultCustomers[j];
-                let matchCount = 0;
-                if (a.name && a.name === b.name) matchCount++;
-                if (a.company && a.company === b.company) matchCount++;
-                if (a.email && a.email === b.email) matchCount++;
-                if (a.phone && a.phone === b.phone) matchCount++;
-                if (a.phone_mobile && a.phone_mobile === b.phone_mobile) matchCount++;
-                if (a.department && a.department === b.department) matchCount++;
-                if (a.role && a.role === b.role) matchCount++;
 
-                if (matchCount >= 3) {
+                const isNameMatch = a.name && b.name && a.name === b.name;
+                const isRomajiMatch = a.name_romaji && b.name_romaji && a.name_romaji === b.name_romaji;
+
+                if (isNameMatch || isRomajiMatch) {
                     dups.add(a.id);
                     dups.add(b.id);
                 }
@@ -283,7 +278,7 @@ const Dashboard = () => {
                             display: 'flex', alignItems: 'center', gap: '6px'
                         }}
                         onClick={() => setShowDuplicatesOnly(!showDuplicatesOnly)}
-                        title="内容が重複している可能性がある名刺（3項目以上一致）を抽出します"
+                        title="氏名または氏名(ローマ字)が重複している名刺を抽出します"
                     >
                         フィルター: 重複疑いのみ
                     </button>
