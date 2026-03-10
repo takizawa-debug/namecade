@@ -365,7 +365,8 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                         const safeCompany = (extracted.company || '会社不明').replace(/[\/\\?%*:|"<>]/g, '');
                         const safeExchanger = (extracted.exchanger || '交換者不明').replace(/[\/\\?%*:|"<>]/g, '');
                         const ext = (file.name || '').split('.').pop() || 'pdf';
-                        const newFileName = `${safeExchanger}_${safeName}_${safeCompany}.${ext}`;
+                        const duplicateTag = saveData.duplicate ? '【重複】' : '';
+                        const newFileName = `${safeExchanger}_${safeName}_${safeCompany}${duplicateTag}.${ext}`;
 
                         const moveRes = await fetch('/api/drive/move', {
                             method: 'POST',
