@@ -18,7 +18,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             email, phone, phone_mobile, fax,
             address, postal_code, prefecture, city, address_line1, address_line2,
             website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, name_romaji,
-            exchanger, business_category, tags, memo, imageUrl, aiAnalysis
+            exchanger, business_category, tags, memo, imageUrl, aiAnalysis, drive_file_id
         } = data;
 
         // Duplicate Check Heuristic (>= 3 matching elements among key fields)
@@ -47,9 +47,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
                 email, phone, phone_mobile, fax, 
                 address, postal_code, prefecture, city, address_line1, address_line2, 
                 website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, name_romaji,
-                exchanger, business_category, tags, memo, image_url, ai_analysis
+                exchanger, business_category, tags, memo, image_url, ai_analysis, drive_file_id
             ) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(
             name || '',
             company || '',
@@ -77,7 +77,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             tags || '',
             memo || '',
             imageUrl || '',
-            aiAnalysis || ''
+            aiAnalysis || '',
+            drive_file_id || ''
         );
 
         const result = await stmt.run();

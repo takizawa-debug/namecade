@@ -167,8 +167,21 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                     const files = listData.files || [];
                     if (files.length === 0) {
+                        try {
+                            const cleanupRes = await fetch('/api/drive/cleanup', { method: 'POST' });
+                            if (cleanupRes.ok) {
+                                const cleanupData = await cleanupRes.json();
+                                if (cleanupData.success && cleanupData.deletedCount > 0) {
+                                    console.log(`Cleaned up ${cleanupData.deletedCount} orphaned rows.`);
+                                    setLatestProcessedTime(Date.now()); // trigger refresh on dashboard
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Cleanup failed", e);
+                        }
+
                         if (totalProcessedInSession === 0 && !hasCheckedAtLeastOnce) {
-                            alert('Googleドライブの「未登録」フォルダに新しい名刺画像がありません。');
+                            alert('Googleドライブの「未登録」フォルダに新しい名刺画像がありません。\n(※ドライブ上で削除済みのデータがあれば整理されました)');
                         } else {
                             if (totalProcessedInSession > 0) {
                                 alert(`全ての同期・解析が完了しました！\n(このタブで処理またはスキップした合計枚数: ${totalProcessedInSession}枚)`);
@@ -327,7 +340,8 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
 
                         const customerData = {
                             ...extracted,
-                            imageUrl: dlData.url
+                            imageUrl: dlData.url,
+                            drive_file_id: file.id
                         };
                         const saveRes = await fetch('/api/customers', {
                             method: 'POST',
