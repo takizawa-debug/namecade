@@ -3,7 +3,7 @@ import React, { createContext, useState, useEffect, useRef } from 'react';
 export interface SyncLog {
     id: string;
     fileName: string;
-    status: 'pending' | 'downloading' | 'parsing' | 'saving' | 'completed' | 'error';
+    status: 'pending' | 'downloading' | 'parsing' | 'saving' | 'completed' | 'skipped' | 'error';
     result?: any;
     errorMsg?: string;
 }
@@ -186,6 +186,20 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 };
 
                 try {
+                    // Try to claim file lock for parallel processing
+                    const claimRes = await fetch('/api/drive/claim', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fileId: file.id })
+                    });
+                    const claimData = await claimRes.json();
+
+                    if (claimRes.ok && claimData.success === false && claimData.claimed === false) {
+                        console.log(`File ${file.name} is already claimed by another tab/session. Skipping.`);
+                        updateLogLocal('skipped', { errorMsg: '別プロセスで処理中' });
+                        continue;
+                    }
+
                     updateLogLocal('downloading');
                     const dlRes = await fetch('/api/drive/download', {
                         method: 'POST',
@@ -312,6 +326,9 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                 } catch (err: any) {
                     console.error("File processing failed: ", file.name, err);
                     updateLogLocal('error', { errorMsg: err.message || String(err) });
+                } finally {
+                    // Release the lock when done processing
+                    fetch(`/api/drive/claim?fileId=${file.id}`, { method: 'DELETE' }).catch(console.error);
                 }
             }
 
@@ -359,15 +376,16 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                                         </td>
                                         <td style={{ padding: '6px', fontSize: '12px' }}>
                                             {log.status === 'pending' ? <span style={{ color: '#94a3b8' }}>待機中</span> :
-                                                log.status === 'downloading' ? <span style={{ color: '#0369a1' }}>取得中</span> :
-                                                    log.status === 'parsing' ? <span style={{ color: '#854d0e' }}>解析中</span> :
-                                                        log.status === 'saving' ? <span style={{ color: '#166534' }}>保存中</span> :
-                                                            log.status === 'completed' ? <span style={{ color: '#10b981' }}>完了</span> :
-                                                                log.status === 'error' ? <span style={{ color: '#ef4444' }}>エラー</span> : ''}
+                                                log.status === 'skipped' ? <span style={{ color: '#cbd5e1' }}>スキップ</span> :
+                                                    log.status === 'downloading' ? <span style={{ color: '#0369a1' }}>取得中</span> :
+                                                        log.status === 'parsing' ? <span style={{ color: '#854d0e' }}>解析中</span> :
+                                                            log.status === 'saving' ? <span style={{ color: '#166534' }}>保存中</span> :
+                                                                log.status === 'completed' ? <span style={{ color: '#10b981' }}>完了</span> :
+                                                                    log.status === 'error' ? <span style={{ color: '#ef4444' }}>エラー</span> : ''}
                                         </td>
                                         <td style={{ padding: '6px', fontSize: '12px', color: '#334155', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {log.status === 'error' ? (
-                                                <span style={{ color: '#ef4444' }} title={log.errorMsg}>{log.errorMsg}</span>
+                                            {(log.status === 'error' || log.status === 'skipped') ? (
+                                                <span style={{ color: log.status === 'error' ? '#ef4444' : '#94a3b8' }} title={log.errorMsg}>{log.errorMsg}</span>
                                             ) : log.result ? (
                                                 <span title={`${log.result.company} ${log.result.name}`}>
                                                     <strong>{log.result.company}</strong> {log.result.name}
