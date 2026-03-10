@@ -123,99 +123,104 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSyncing(true);
         setShowSyncPanel(true);
 
-        let currentState: any;
-        if (isResume && savedState) {
-            currentState = savedState;
-            setLogs(currentState.logs);
-            setProgressStats({ total: currentState.files.length, current: currentState.currentIndex });
-        } else {
-            setLogs([]);
-            setProgressStats({ total: 0, current: 0 });
-
-            try {
-                const listRes = await fetch('/api/drive/list');
-                if (!listRes.ok) throw new Error(await listRes.text());
-                const listData = await listRes.json();
-
-                if (!listData.success) throw new Error(listData.error);
-
-                const files = listData.files || [];
-                if (files.length === 0) {
-                    alert('Googleドライブの「未登録」フォルダに新しい名刺画像がありません。');
-                    setSyncing(false);
-                    setTimeout(() => setShowSyncPanel(false), 3000);
-                    return;
-                }
-
-                const initialLogs: SyncLog[] = files.map((f: any) => ({
-                    id: f.id,
-                    fileName: f.name,
-                    status: 'pending'
-                }));
-
-                currentState = { isRunning: true, files, logs: initialLogs, currentIndex: 0, newCustomersFound: false };
-                setLogs(initialLogs);
-                setProgressStats({ total: files.length, current: 0 });
-                localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
-            } catch (err: any) {
-                console.error('Failed to fetch list', err);
-                alert('リスト取得中にエラーが発生しました。');
-                setSyncing(false);
-                setShowSyncPanel(false);
-                return;
-            }
-        }
+        let totalProcessedInSession = 0;
+        let hasCheckedAtLeastOnce = false;
 
         try {
-            for (let i = currentState.currentIndex; i < currentState.files.length; i++) {
-                currentState.currentIndex = i;
-                localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+            while (true) {
+                let currentState: any;
+                if (isResume && savedState) {
+                    currentState = savedState;
+                    setLogs(currentState.logs);
+                    setProgressStats({ total: currentState.files.length, current: currentState.currentIndex });
+                    isResume = false;
+                } else {
+                    setLogs([]);
+                    setProgressStats({ total: 0, current: totalProcessedInSession });
 
-                const file = currentState.files[i];
-                setProgressStats(prev => ({ ...prev, current: i + 1 }));
+                    const listRes = await fetch('/api/drive/list');
+                    if (!listRes.ok) throw new Error(await listRes.text());
+                    const listData = await listRes.json();
 
-                let currentLogs = [...currentState.logs];
-                const updateLogLocal = (status: any, extra = {}) => {
-                    const idx = currentLogs.findIndex((l: any) => l.id === file.id);
-                    if (idx > -1) {
-                        currentLogs[idx] = { ...currentLogs[idx], status, ...extra };
-                        setLogs([...currentLogs]);
-                        currentState.logs = currentLogs;
-                        localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
-                    }
-                };
+                    if (!listData.success) throw new Error(listData.error);
 
-                try {
-                    // Try to claim file lock for parallel processing
-                    const claimRes = await fetch('/api/drive/claim', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ fileId: file.id })
-                    });
-                    const claimData = await claimRes.json();
-
-                    if (claimRes.ok && claimData.success === false && claimData.claimed === false) {
-                        console.log(`File ${file.name} is already claimed by another tab/session. Skipping.`);
-                        updateLogLocal('skipped', { errorMsg: '別プロセスで処理中' });
-                        continue;
+                    const files = listData.files || [];
+                    if (files.length === 0) {
+                        if (totalProcessedInSession === 0 && !hasCheckedAtLeastOnce) {
+                            alert('Googleドライブの「未登録」フォルダに新しい名刺画像がありません。');
+                        } else {
+                            if (totalProcessedInSession > 0) {
+                                alert(`全ての同期・解析が完了しました！\n(このタブで処理またはスキップした合計枚数: ${totalProcessedInSession}枚)`);
+                            }
+                        }
+                        setShowSyncPanel(false);
+                        break;
                     }
 
-                    updateLogLocal('downloading');
-                    const dlRes = await fetch('/api/drive/download', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ fileId: file.id, fileName: file.name, mimeType: file.mimeType })
-                    });
-                    if (!dlRes.ok) throw new Error(await dlRes.text());
-                    const dlData = await dlRes.json();
-                    if (!dlData.success) throw new Error(dlData.error);
+                    hasCheckedAtLeastOnce = true;
 
-                    const imgRes = await fetch(dlData.url);
-                    const blob = await imgRes.blob();
-                    const base64Data = await toBase64(blob);
+                    const initialLogs: SyncLog[] = files.map((f: any) => ({
+                        id: f.id,
+                        fileName: f.name,
+                        status: 'pending'
+                    }));
 
-                    updateLogLocal('parsing');
-                    const promptText = `あなたはプロフェッショナルな名刺情報抽出・分析アシスタントです。提供された名刺画像（表裏両面が含まれている場合もあります）から、以下の情報を日本語を最優先して極めて高い精度で抽出し、指定されたJSON構造のみを出力してください。
+                    currentState = { isRunning: true, files, logs: initialLogs, currentIndex: 0, newCustomersFound: false };
+                    setLogs(initialLogs);
+                    setProgressStats({ total: files.length, current: 0 });
+                    localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+                }
+
+                for (let i = currentState.currentIndex; i < currentState.files.length; i++) {
+                    currentState.currentIndex = i;
+                    localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+
+                    const file = currentState.files[i];
+                    setProgressStats(prev => ({ ...prev, current: i + 1 }));
+                    totalProcessedInSession++;
+
+                    let currentLogs = [...currentState.logs];
+                    const updateLogLocal = (status: any, extra = {}) => {
+                        const idx = currentLogs.findIndex((l: any) => l.id === file.id);
+                        if (idx > -1) {
+                            currentLogs[idx] = { ...currentLogs[idx], status, ...extra };
+                            setLogs([...currentLogs]);
+                            currentState.logs = currentLogs;
+                            localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+                        }
+                    };
+
+                    try {
+                        // Try to claim file lock for parallel processing
+                        const claimRes = await fetch('/api/drive/claim', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ fileId: file.id })
+                        });
+                        const claimData = await claimRes.json();
+
+                        if (claimRes.ok && claimData.success === false && claimData.claimed === false) {
+                            console.log(`File ${file.name} is already claimed by another tab/session. Skipping.`);
+                            updateLogLocal('skipped', { errorMsg: '別プロセスで処理中' });
+                            continue;
+                        }
+
+                        updateLogLocal('downloading');
+                        const dlRes = await fetch('/api/drive/download', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ fileId: file.id, fileName: file.name, mimeType: file.mimeType })
+                        });
+                        if (!dlRes.ok) throw new Error(await dlRes.text());
+                        const dlData = await dlRes.json();
+                        if (!dlData.success) throw new Error(dlData.error);
+
+                        const imgRes = await fetch(dlData.url);
+                        const blob = await imgRes.blob();
+                        const base64Data = await toBase64(blob);
+
+                        updateLogLocal('parsing');
+                        const promptText = `あなたはプロフェッショナルな名刺情報抽出・分析アシスタントです。提供された名刺画像（表裏両面が含まれている場合もあります）から、以下の情報を日本語を最優先して極めて高い精度で抽出し、指定されたJSON構造のみを出力してください。
 
 抽出と同時に、取得した総合的な情報から、相手がどのような組織・業種に属しているか、どのような役立つ接点（ビジネスチャンスなど）が持てそうか等について「AI分析コメント（150文字程度）」を作成し、\`aiAnalysis\`フィールドに格納してください。裏面の情報も加味してください。WEBサイトのURLやQRコード等があればそれも抽出してください。
 
@@ -263,83 +268,85 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
 - AI分析コメントは、名刺から得られた「客観的な事実（業種・部署・役職など）」のみから推測される、どのようなビジネスの接点になり得るかという簡潔なコメントを100文字程度で記述してください。
 - JSONフォーマット以外（説明テキストや\`\`\`jsonなどのマークダウン）は一切出力しないでください。`;
 
-                    const parseRes = await fetch('/api/parse', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: promptText, base64Data, mimeType: dlData.mimeType })
-                    });
+                        const parseRes = await fetch('/api/parse', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ prompt: promptText, base64Data, mimeType: dlData.mimeType })
+                        });
 
-                    if (!parseRes.ok) throw new Error(await parseRes.text());
-                    const parseData = await parseRes.json();
-                    if (!parseData.success) {
-                        if (parseData.error && parseData.error.includes && parseData.error.includes("leaked")) {
-                            throw new Error("Gemini APIキーが無効化されています。");
+                        if (!parseRes.ok) throw new Error(await parseRes.text());
+                        const parseData = await parseRes.json();
+                        if (!parseData.success) {
+                            if (parseData.error && parseData.error.includes && parseData.error.includes("leaked")) {
+                                throw new Error("Gemini APIキーが無効化されています。");
+                            }
+                            throw new Error(parseData.error);
                         }
-                        throw new Error(parseData.error);
+                        const extracted = parseData.data;
+
+                        if (file.folderName) {
+                            extracted.exchanger = file.folderName;
+                        }
+
+                        updateLogLocal('saving', { result: extracted });
+
+                        const customerData = {
+                            ...extracted,
+                            imageUrl: dlData.url
+                        };
+                        const saveRes = await fetch('/api/customers', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(customerData)
+                        });
+                        if (!saveRes.ok) throw new Error("データベースへの保存に失敗しました");
+
+                        const safeName = (extracted.name || '名前不明').replace(/[\/\\?%*:|"<>]/g, '');
+                        const safeCompany = (extracted.company || '会社不明').replace(/[\/\\?%*:|"<>]/g, '');
+                        const safeExchanger = (extracted.exchanger || '交換者不明').replace(/[\/\\?%*:|"<>]/g, '');
+                        const ext = (file.name || '').split('.').pop() || 'pdf';
+                        const newFileName = `${safeExchanger}_${safeName}_${safeCompany}.${ext}`;
+
+                        const moveRes = await fetch('/api/drive/move', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ fileId: file.id, newName: newFileName })
+                        });
+
+                        if (!moveRes.ok) {
+                            const moveErr = await moveRes.json();
+                            throw new Error(`ドライブ移動エラー: ${moveErr.error || 'Unknown'}`);
+                        }
+
+                        updateLogLocal('completed');
+                        currentState.newCustomersFound = true;
+
+                        if (extracted.company) {
+                            setExistingCompanies(prev => prev.includes(extracted.company) ? prev : [...prev, extracted.company]);
+                        }
+
+                        // 1枚完了するごとに、Dashboard側がテーブルを更新できるようタイムスタンプを更新する
+                        setLatestProcessedTime(Date.now());
+
+                    } catch (err: any) {
+                        console.error("File processing failed: ", file.name, err);
+                        updateLogLocal('error', { errorMsg: err.message || String(err) });
+                    } finally {
+                        // Release the lock when done processing
+                        fetch(`/api/drive/claim?fileId=${file.id}`, { method: 'DELETE' }).catch(console.error);
                     }
-                    const extracted = parseData.data;
-
-                    if (file.folderName) {
-                        extracted.exchanger = file.folderName;
-                    }
-
-                    updateLogLocal('saving', { result: extracted });
-
-                    const customerData = {
-                        ...extracted,
-                        imageUrl: dlData.url
-                    };
-                    const saveRes = await fetch('/api/customers', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(customerData)
-                    });
-                    if (!saveRes.ok) throw new Error("データベースへの保存に失敗しました");
-
-                    const safeName = (extracted.name || '名前不明').replace(/[\/\\?%*:|"<>]/g, '');
-                    const safeCompany = (extracted.company || '会社不明').replace(/[\/\\?%*:|"<>]/g, '');
-                    const safeExchanger = (extracted.exchanger || '交換者不明').replace(/[\/\\?%*:|"<>]/g, '');
-                    const ext = (file.name || '').split('.').pop() || 'pdf';
-                    const newFileName = `${safeExchanger}_${safeName}_${safeCompany}.${ext}`;
-
-                    const moveRes = await fetch('/api/drive/move', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ fileId: file.id, newName: newFileName })
-                    });
-
-                    if (!moveRes.ok) {
-                        const moveErr = await moveRes.json();
-                        throw new Error(`ドライブ移動エラー: ${moveErr.error || 'Unknown'}`);
-                    }
-
-                    updateLogLocal('completed');
-                    currentState.newCustomersFound = true;
-
-                    if (extracted.company) {
-                        setExistingCompanies(prev => prev.includes(extracted.company) ? prev : [...prev, extracted.company]);
-                    }
-
-                    // 1枚完了するごとに、Dashboard側がテーブルを更新できるようタイムスタンプを更新する
-                    setLatestProcessedTime(Date.now());
-
-                } catch (err: any) {
-                    console.error("File processing failed: ", file.name, err);
-                    updateLogLocal('error', { errorMsg: err.message || String(err) });
-                } finally {
-                    // Release the lock when done processing
-                    fetch(`/api/drive/claim?fileId=${file.id}`, { method: 'DELETE' }).catch(console.error);
                 }
+
+                currentState.isRunning = false;
+                currentState.currentIndex = currentState.files.length;
+                localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+
+                setLatestProcessedTime(Date.now());
+                localStorage.removeItem('namecard_sync_state');
+
+                // Wait a moment for Drive moves to fully propagate before fetching the list again
+                await new Promise(resolve => setTimeout(resolve, 1500));
             }
-
-            currentState.isRunning = false;
-            currentState.currentIndex = currentState.files.length;
-            localStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
-
-            setLatestProcessedTime(Date.now());
-            localStorage.removeItem('namecard_sync_state');
-
-            alert("Google Driveの同期・解析が完了しました！");
 
         } catch (error) {
             console.error("Drive sync failed", error);
@@ -357,11 +364,13 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                 <div className="sync-overlay card animate-fade-in" style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 99999, width: 450, padding: 16, boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                         <h3 style={{ margin: 0, fontSize: 16 }}>クラウド同期・自動解析状況</h3>
-                        {!syncing && (
-                            <button className="btn-secondary btn-sm" onClick={() => setShowSyncPanel(false)}>
-                                閉じる
-                            </button>
-                        )}
+                        <button className="btn-secondary btn-sm" onClick={() => {
+                            setSyncing(false);
+                            setShowSyncPanel(false);
+                            localStorage.removeItem('namecard_sync_state');
+                        }}>
+                            {syncing ? '停止・閉じる' : '閉じる'}
+                        </button>
                     </div>
                     <div style={{ paddingBottom: '8px', borderBottom: '1px solid #e2e8f0', marginBottom: '8px' }}>
                         <span style={{ fontSize: 14, fontWeight: 'bold' }}>処理中: {progressStats.current} / {progressStats.total} 枚</span>
