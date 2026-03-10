@@ -70,7 +70,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         do {
             const listUrl = new URL('https://www.googleapis.com/drive/v3/files');
             listUrl.searchParams.set('q', query);
-            listUrl.searchParams.set('fields', 'nextPageToken, files(id, parents)');
+            listUrl.searchParams.set('fields', 'nextPageToken, files(id, name, parents)');
             listUrl.searchParams.set('supportsAllDrives', 'true');
             listUrl.searchParams.set('includeItemsFromAllDrives', 'true');
             listUrl.searchParams.set('pageSize', '1000');
@@ -87,12 +87,15 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
                 throw new Error(`Google Drive API error: ${text}`);
             }
 
-            const data = await listRes.json() as { files: { id: string, parents?: string[] }[], nextPageToken?: string };
+            const data = await listRes.json() as { files: { id: string, name: string, parents?: string[] }[], nextPageToken?: string };
             data.files.forEach(f => {
                 allDriveFiles.add(f.id);
                 // If it's in the DEST folder but not registered in the DB, we need to move it back to SOURCE
                 if (f.parents && f.parents.includes(DEST_FOLDER_ID) && !dbFileIds.has(f.id)) {
-                    destFilesNotInDb.push(f.id);
+                    // Do not auto-revert explicitly skipped duplicate files
+                    if (!f.name.includes('【重複】')) {
+                        destFilesNotInDb.push(f.id);
+                    }
                 }
             });
 
