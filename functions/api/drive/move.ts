@@ -50,66 +50,27 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         const { fileId, newName } = await context.request.json() as any;
         const accessToken = await getAccessToken(context.env);
 
-        // For Shared Drives, moving files or changing parents often faces the teamDrivesParentLimit constraint.
-        // It is safer to make a copy in the new location and delete the old one.
+        // 1. Move the file from the SOURCE folder to the DEST folder
+        // For Shared Drives, moving files within the same shared drive is allowed using PATCH.
+        const patchUrl = new URL(`https://www.googleapis.com/drive/v3/files/${fileId}`);
+        patchUrl.searchParams.set('addParents', DEST_FOLDER_ID);
+        patchUrl.searchParams.set('removeParents', SOURCE_FOLDER_ID);
+        patchUrl.searchParams.set('supportsAllDrives', 'true');
 
-        // 0. Get the driveId for DEST_FOLDER_ID
-        const destFolderRes = await fetch(`https://www.googleapis.com/drive/v3/files/${DEST_FOLDER_ID}?fields=driveId&supportsAllDrives=true`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
+        const moveBody = newName ? { name: newName } : undefined;
 
-        let destinationDriveId = undefined;
-        if (destFolderRes.ok) {
-            const destFolderData = await destFolderRes.json() as any;
-            destinationDriveId = destFolderData.driveId;
-        }
-
-        // 1. Copy the file to the destination folder
-        // The API requires knowing WHICH shared drive we are copying to, otherwise it throws 'insufficient permissions'.
-        // We supply both the new parent AND the target shared drive ID.
-        let copyUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/copy?supportsAllDrives=true`;
-
-        const copyBody: any = {
-            parents: [DEST_FOLDER_ID],
-            ...(destinationDriveId ? { driveId: destinationDriveId } : {})
-        };
-
-        if (newName) {
-            copyBody.name = newName;
-        }
-
-        const copyRes = await fetch(copyUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(copyBody)
-        });
-
-        if (!copyRes.ok) {
-            const errText = await copyRes.text();
-            throw new Error(`ファイルを「完了済」フォルダへコピーできませんでした: ${errText}`);
-        }
-
-        // 2. Trash the original file instead of hard delete
-        // Content Managers in Shared Drives can only trash files, not permanently delete them (which DELETE does).
-        const trashRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {
+        const moveRes = await fetch(patchUrl.toString(), {
             method: 'PATCH',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                trashed: true
-            })
+            body: moveBody ? JSON.stringify(moveBody) : undefined
         });
 
-        if (!trashRes.ok) {
-            const errText = await trashRes.text();
-            // If trashing fails with 404 or something, we shouldn't completely fail the move since copy succeeded.
-            // But we will throw a readable error so the user knows.
-            throw new Error(`コピーは成功しましたが、元の「未登録」ファイルのゴミ箱移動に失敗しました (手動で削除してください): ${errText}`);
+        if (!moveRes.ok) {
+            const errText = await moveRes.text();
+            throw new Error(`ファイルを「完了済」フォルダへ移動できませんでした: ${errText}`);
         }
 
         return Response.json({ success: true });
