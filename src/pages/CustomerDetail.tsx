@@ -189,7 +189,7 @@ const CustomerDetail = () => {
                                 ) : (
                                     <span className="info-value">
                                         {customer.website ? (
-                                            <a href={customer.website} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)' }}>{customer.website}</a>
+                                            <a href={customer.website.startsWith('http') ? customer.website : `https://${customer.website}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)' }}>{customer.website}</a>
                                         ) : ''}
                                     </span>
                                 )}

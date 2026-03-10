@@ -367,7 +367,8 @@ const Dashboard = () => {
                                             if (col.key === 'added_at') {
                                                 val = new Date(customer.addedAt || customer.added_at || Date.now()).toLocaleDateString();
                                             } else if (col.key === 'website' && customer.website) {
-                                                val = <a href={customer.website} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#0ea5e9' }}>{customer.website}</a>;
+                                                const url = customer.website.startsWith('http') ? customer.website : `https://${customer.website}`;
+                                                val = <a href={url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#0ea5e9' }}>{customer.website}</a>;
                                             } else if (col.key === 'sns_x' && customer.sns_x) {
                                                 val = <a href={customer.sns_x.startsWith('http') ? customer.sns_x : `https://x.com/${customer.sns_x}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#0ea5e9' }}>{customer.sns_x}</a>;
                                             } else if (col.key === 'exchanger' && customer.exchanger && customer.exchanger !== '-') {
