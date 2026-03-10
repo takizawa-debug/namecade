@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useRef } from 'react';
 
 export interface SyncLog {
     id: string;
@@ -41,6 +41,52 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // We keep existingCompanies just like Dashboard did, to feed into AI
     const [existingCompanies, setExistingCompanies] = useState<string[]>([]);
+    const wakeLockRef = useRef<any>(null);
+
+    // Prevent device sleep during sync using Screen Wake Lock API
+    useEffect(() => {
+        const requestWakeLock = async () => {
+            if (syncing && 'wakeLock' in navigator) {
+                try {
+                    wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+                    console.log('Screen Wake Lock acquired');
+                    wakeLockRef.current.addEventListener('release', () => {
+                        console.log('Screen Wake Lock released manually or automatically');
+                    });
+                } catch (err) {
+                    console.error('Wake Lock error:', err);
+                }
+            }
+        };
+
+        const releaseWakeLock = async () => {
+            if (wakeLockRef.current) {
+                try {
+                    await wakeLockRef.current.release();
+                } catch (e) { }
+                wakeLockRef.current = null;
+            }
+        };
+
+        if (syncing) {
+            requestWakeLock();
+        } else {
+            releaseWakeLock();
+        }
+
+        // Re-acquire lock if tab becomes visible again while syncing
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && syncing) {
+                requestWakeLock();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            releaseWakeLock();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [syncing]);
 
     useEffect(() => {
         // Fetch existing companies once to initialize
