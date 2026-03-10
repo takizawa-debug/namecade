@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from 'react';
-import { Search, Trash, Cloud, Loader } from 'lucide-react';
+import { Search, Trash, Cloud, Loader, Edit2, Save, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { SyncContext } from '../contexts/SyncContext';
@@ -41,6 +41,8 @@ const Dashboard = () => {
     const [filters, setFilters] = useState<Record<string, string>>({});
     const [showBulkEdit, setShowBulkEdit] = useState(false);
     const [bulkEditData, setBulkEditData] = useState({ business_category: '', tags: '', exchanger: '', added_at: '' });
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [editData, setEditData] = useState<any>({});
     const syncContextObj = useContext(SyncContext);
     const { syncing, progressStats, latestProcessedTime, handleDriveSync } = syncContextObj || { syncing: false, progressStats: { total: 0, current: 0 }, latestProcessedTime: Date.now(), handleDriveSync: () => { } };
 
@@ -113,6 +115,25 @@ const Dashboard = () => {
         } catch (error) {
             console.error("Bulk edit failed", error);
             alert("一括編集に失敗しました。");
+            setLoading(false);
+        }
+    };
+
+    const saveInlineEdit = async (id: number) => {
+        setLoading(true);
+        try {
+            const dataToUpdate = { ...editData };
+            const res = await fetch(`/api/customers/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dataToUpdate)
+            });
+            if (!res.ok) throw new Error("Save failed");
+            setEditingId(null);
+            fetchCustomers();
+        } catch (error) {
+            console.error("Edit failed", error);
+            alert("編集の保存に失敗しました。");
             setLoading(false);
         }
     };
@@ -250,7 +271,7 @@ const Dashboard = () => {
                 </div>, document.body
             )}
 
-            <div className="card table-container" style={{ overflowX: 'auto', paddingBottom: '1rem' }}>
+            <div className="card table-container" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 220px)', paddingBottom: '1rem' }}>
                 <table className="data-table" style={{ minWidth: '2500px' }}>
                     <thead>
                         <tr>
@@ -290,7 +311,7 @@ const Dashboard = () => {
                                     </th>
                                 );
                             })}
-                            <th style={{ position: 'sticky', top: 0, right: 0, background: '#f8fafc', zIndex: 30, width: '40px', borderBottom: '1px solid #e2e8f0' }}></th>
+                            <th style={{ position: 'sticky', top: 0, right: 0, background: '#f8fafc', zIndex: 40, width: '90px', borderBottom: '1px solid #e2e8f0' }}></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -351,19 +372,45 @@ const Dashboard = () => {
 
                                             return (
                                                 <td key={col.key} style={{ minWidth: col.width, maxWidth: col.width, position: isStickyX ? 'sticky' : undefined, left: left, background: isStickyX ? rowBg : undefined, zIndex: isStickyX ? 20 : undefined, boxShadow: isStickyX && col.key === 'name' ? '4px 0 6px -2px rgba(0,0,0,0.05)' : undefined }}>
-                                                    <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: col.width }} title={String(customer[col.key] || '')}>
-                                                        {val}
-                                                    </div>
+                                                    {editingId === customer.id ? (
+                                                        <input
+                                                            type={col.key === 'added_at' ? 'date' : 'text'}
+                                                            className="input-field"
+                                                            style={{ width: '100%', padding: '4px', fontSize: '12px', height: '28px' }}
+                                                            value={col.key === 'added_at' ? (editData[col.key] ? new Date(editData[col.key]).toISOString().split('T')[0] : '') : (editData[col.key] || '')}
+                                                            onChange={e => setEditData({ ...editData, [col.key]: e.target.value })}
+                                                            onClick={e => e.stopPropagation()}
+                                                        />
+                                                    ) : (
+                                                        <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: col.width }} title={String(customer[col.key] || '')}>
+                                                            {val}
+                                                        </div>
+                                                    )}
                                                 </td>
                                             );
                                         })}
-                                        <td style={{ position: 'sticky', right: 0, background: rowBg, zIndex: 10, paddingRight: '1rem' }} onClick={e => e.stopPropagation()}>
-                                            <button className="icon-btn danger" onClick={async () => {
-                                                if (window.confirm('この連絡先を削除しますか？')) {
-                                                    await fetch(`/api/customers/${customer.id}`, { method: 'DELETE' });
-                                                    fetchCustomers();
-                                                }
-                                            }}><Trash size={16} /></button>
+                                        <td style={{ position: 'sticky', right: 0, background: rowBg, zIndex: 10, minWidth: '90px', paddingRight: '1rem' }} onClick={e => e.stopPropagation()}>
+                                            {editingId === customer.id ? (
+                                                <div style={{ display: 'flex', gap: '4px' }}>
+                                                    <button className="icon-btn" onClick={(e) => { e.stopPropagation(); saveInlineEdit(customer.id); }} style={{ color: '#10b981' }} title="保存"><Save size={16} /></button>
+                                                    <button className="icon-btn" onClick={(e) => { e.stopPropagation(); setEditingId(null); }} style={{ color: '#64748b' }} title="キャンセル"><X size={16} /></button>
+                                                </div>
+                                            ) : (
+                                                <div style={{ display: 'flex', gap: '4px' }}>
+                                                    <button className="icon-btn" onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditingId(customer.id);
+                                                        setEditData({ ...customer, added_at: customer.addedAt || customer.added_at });
+                                                    }} style={{ color: '#0ea5e9' }} title="編集"><Edit2 size={16} /></button>
+                                                    <button className="icon-btn danger" onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        if (window.confirm('この連絡先を削除しますか？')) {
+                                                            await fetch(`/api/customers/${customer.id}`, { method: 'DELETE' });
+                                                            fetchCustomers();
+                                                        }
+                                                    }} title="削除"><Trash size={16} /></button>
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
                                 );

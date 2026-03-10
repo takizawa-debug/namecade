@@ -23,7 +23,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
             email, phone, phone_mobile, fax,
             address, postal_code, prefecture, city, address_line1, address_line2,
             website, sns_x, sns_facebook, sns_instagram, sns_linkedin, sns_other, name_romaji,
-            exchanger, business_category, tags, memo, ai_analysis
+            exchanger, business_category, tags, memo, ai_analysis, added_at
         } = data;
 
         const stmt = context.env.DB.prepare(
@@ -32,7 +32,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
                 email=?, phone=?, phone_mobile=?, fax=?,
                 address=?, postal_code=?, prefecture=?, city=?, address_line1=?, address_line2=?,
                 website=?, sns_x=?, sns_facebook=?, sns_instagram=?, sns_linkedin=?, sns_other=?, name_romaji=?,
-                exchanger=?, business_category=?, tags=?, memo=?, ai_analysis=?
+                exchanger=?, business_category=?, tags=?, memo=?, ai_analysis=?, added_at=COALESCE(?, added_at)
             WHERE id=?`
         ).bind(
             name || '',
@@ -61,6 +61,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
             tags || '',
             memo || '',
             ai_analysis || '',
+            added_at || null,
             id
         );
 
