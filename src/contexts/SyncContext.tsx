@@ -316,6 +316,7 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                             body: JSON.stringify(customerData)
                         });
                         if (!saveRes.ok) throw new Error("データベースへの保存に失敗しました");
+                        const saveData = await saveRes.json();
 
                         const safeName = (extracted.name || '名前不明').replace(/[\/\\?%*:|"<>]/g, '');
                         const safeCompany = (extracted.company || '会社不明').replace(/[\/\\?%*:|"<>]/g, '');
@@ -334,11 +335,15 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                             throw new Error(`ドライブ移動エラー: ${moveErr.error || 'Unknown'}`);
                         }
 
-                        updateLogLocal('completed');
-                        currentState.newCustomersFound = true;
+                        if (saveData.duplicate) {
+                            updateLogLocal('skipped', { errorMsg: '内容重複（取込スキップ）' });
+                        } else {
+                            updateLogLocal('completed');
+                            currentState.newCustomersFound = true;
 
-                        if (extracted.company) {
-                            setExistingCompanies(prev => prev.includes(extracted.company) ? prev : [...prev, extracted.company]);
+                            if (extracted.company) {
+                                setExistingCompanies(prev => prev.includes(extracted.company) ? prev : [...prev, extracted.company]);
+                            }
                         }
 
                         // 1枚完了するごとに、Dashboard側がテーブルを更新できるようタイムスタンプを更新する

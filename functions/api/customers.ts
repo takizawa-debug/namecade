@@ -21,6 +21,26 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             exchanger, business_category, tags, memo, imageUrl, aiAnalysis
         } = data;
 
+        // Duplicate Check Heuristic (>= 3 matching elements among key fields)
+        const checkStmt = context.env.DB.prepare(`
+            SELECT id FROM customers WHERE (
+                (CASE WHEN name = ? AND name != '' THEN 1 ELSE 0 END) +
+                (CASE WHEN company = ? AND company != '' THEN 1 ELSE 0 END) +
+                (CASE WHEN email = ? AND email != '' THEN 1 ELSE 0 END) +
+                (CASE WHEN phone = ? AND phone != '' THEN 1 ELSE 0 END) +
+                (CASE WHEN phone_mobile = ? AND phone_mobile != '' THEN 1 ELSE 0 END) +
+                (CASE WHEN department = ? AND department != '' THEN 1 ELSE 0 END) +
+                (CASE WHEN role = ? AND role != '' THEN 1 ELSE 0 END)
+            ) >= 3 LIMIT 1
+        `).bind(
+            name || '', company || '', email || '', phone || '', phone_mobile || '', department || '', role || ''
+        );
+
+        const checkRes = await checkStmt.all();
+        if (checkRes.results && checkRes.results.length > 0) {
+            return Response.json({ success: true, duplicate: true, message: '重複データと判定されました' });
+        }
+
         const stmt = context.env.DB.prepare(
             `INSERT INTO customers (
                 name, company, role, department, 
