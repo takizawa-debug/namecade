@@ -21,19 +21,18 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             exchanger, business_category, tags, memo, imageUrl, aiAnalysis, drive_file_id
         } = data;
 
-        // Duplicate Check Heuristic (>= 3 matching elements among key fields AND exact exchanger match)
+        // Duplicate Check Heuristic (Exact exchanger match, exact company match, and name/name_romaji match)
         const checkStmt = context.env.DB.prepare(`
-            SELECT id FROM customers WHERE exchanger = ? AND (
-                (CASE WHEN name = ? AND name != '' THEN 1 ELSE 0 END) +
-                (CASE WHEN company = ? AND company != '' THEN 1 ELSE 0 END) +
-                (CASE WHEN email = ? AND email != '' THEN 1 ELSE 0 END) +
-                (CASE WHEN phone = ? AND phone != '' THEN 1 ELSE 0 END) +
-                (CASE WHEN phone_mobile = ? AND phone_mobile != '' THEN 1 ELSE 0 END) +
-                (CASE WHEN department = ? AND department != '' THEN 1 ELSE 0 END) +
-                (CASE WHEN role = ? AND role != '' THEN 1 ELSE 0 END)
-            ) >= 3 LIMIT 1
+            SELECT id FROM customers WHERE 
+                exchanger = ? AND
+                company = ? AND company != '' AND 
+                (
+                    (name = ? AND name != '') OR 
+                    (name_romaji = ? AND name_romaji != '')
+                )
+            LIMIT 1
         `).bind(
-            exchanger || '', name || '', company || '', email || '', phone || '', phone_mobile || '', department || '', role || ''
+            exchanger || '', company || '', name || '', name_romaji || ''
         );
 
         const checkRes = await checkStmt.all();
