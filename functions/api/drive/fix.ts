@@ -79,6 +79,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
         let fixedCount = 0;
 
+        // Fetch all customers into memory to avoid SQL LIKE complexity limits
+        const { results } = await context.env.DB.prepare('SELECT id, name, company, exchanger FROM customers').all();
+        const allCustomers = results as { id: number, name: string, company: string, exchanger: string }[];
+
         for (const file of sourceFiles) {
             // Check if the filename maps to our standard format: Exchanger_Name_Company.pdf
             const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.'));
@@ -90,15 +94,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
                 const safeName = parts[1];
                 const safeCompany = parts.slice(2).join('_'); // In case company had underscores
 
-                // Check DB for matching record
-                // Remember we stripped special chars when saving the filename, so we use LIKE
-                const stmt = context.env.DB.prepare(`
-                    SELECT id FROM customers 
-                    WHERE exchanger LIKE ? AND name LIKE ? AND company LIKE ?
-                    LIMIT 1
-                `).bind(`%${safeExchanger}%`, `%${safeName}%`, `%${safeCompany}%`);
-
-                const match = await stmt.first<{ id: number }>();
+                // Check DB for matching record in memory
+                const match = allCustomers.find(c => {
+                    const cExchanger = (c.exchanger || '交換者不明').replace(/[\/\\?%*:|"<>]/g, '');
+                    const cName = (c.name || '名前不明').replace(/[\/\\?%*:|"<>]/g, '');
+                    const cCompany = (c.company || '会社不明').replace(/[\/\\?%*:|"<>]/g, '');
+                    return cExchanger === safeExchanger && cName === safeName && cCompany === safeCompany;
+                });
 
                 if (match) {
                     // 1. Update DB with the current actual drive_file_id
