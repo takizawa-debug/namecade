@@ -1,5 +1,8 @@
 import React, { createContext, useState, useEffect, useRef } from 'react';
+import SyncPanel from '../components/SyncPanel';
+import { buildParsePrompt } from '../constants/ai-prompt';
 
+// ─── Types ──────────────────────────────────────────────────────────────────
 export interface SyncLog {
     id: string;
     fileName: string;
@@ -21,40 +24,34 @@ interface SyncContextType {
 
 export const SyncContext = createContext<SyncContextType | null>(null);
 
-const toBase64 = (blob: Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
+// ─── Helpers ────────────────────────────────────────────────────────────────
+const toBase64 = (blob: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(blob);
-        reader.onload = () => {
-            const result = reader.result as string;
-            resolve(result.split(',')[1]);
-        };
-        reader.onerror = error => reject(error);
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = reject;
     });
-};
 
+const SYNC_STATE_KEY = 'namecard_sync_state';
+
+// ─── Provider ───────────────────────────────────────────────────────────────
 export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [syncing, setSyncing] = useState(false);
     const [showSyncPanel, setShowSyncPanel] = useState(false);
     const [logs, setLogs] = useState<SyncLog[]>([]);
     const [progressStats, setProgressStats] = useState({ total: 0, current: 0 });
     const [latestProcessedTime, setLatestProcessedTime] = useState(Date.now());
-
-    // We keep existingCompanies just like Dashboard did, to feed into AI
     const [existingCompanies, setExistingCompanies] = useState<string[]>([]);
     const wakeLockRef = useRef<any>(null);
     const isSyncingRef = useRef(false);
 
-    // Prevent device sleep during sync using Screen Wake Lock API
+    // ── Wake Lock management ──────────────────────────────────────────
     useEffect(() => {
         const requestWakeLock = async () => {
             if (syncing && 'wakeLock' in navigator) {
                 try {
                     wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
-                    console.log('Screen Wake Lock acquired');
-                    wakeLockRef.current.addEventListener('release', () => {
-                        console.log('Screen Wake Lock released manually or automatically');
-                    });
                 } catch (err) {
                     console.error('Wake Lock error:', err);
                 }
@@ -63,81 +60,72 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const releaseWakeLock = async () => {
             if (wakeLockRef.current) {
-                try {
-                    await wakeLockRef.current.release();
-                } catch (e) { }
+                try { await wakeLockRef.current.release(); } catch (_) {}
                 wakeLockRef.current = null;
             }
         };
 
-        if (syncing) {
-            requestWakeLock();
-        } else {
-            releaseWakeLock();
-        }
+        if (syncing) { requestWakeLock(); } else { releaseWakeLock(); }
 
-        // Re-acquire lock if tab becomes visible again while syncing
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible' && syncing) {
-                requestWakeLock();
-            }
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible' && syncing) requestWakeLock();
         };
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        return () => {
-            releaseWakeLock();
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
+        document.addEventListener('visibilitychange', handleVisibility);
+        return () => { releaseWakeLock(); document.removeEventListener('visibilitychange', handleVisibility); };
     }, [syncing]);
 
+    // ── Initial load + resume ─────────────────────────────────────────
     useEffect(() => {
-        // Fetch existing companies once to initialize
         fetch('/api/customers')
             .then(res => res.json())
             .then(data => {
                 if (Array.isArray(data)) {
-                    const companies = data.map((c: any) => c.company).filter((c: string) => c && c.trim() !== '');
-                    setExistingCompanies([...new Set(companies)] as string[]);
+                    setExistingCompanies([...new Set(data.map((c: any) => c.company).filter(Boolean))] as string[]);
                 }
             })
-            .catch(err => console.error(err));
+            .catch(console.error);
 
-        // Resume sync if there's a pending state
-        const savedSync = sessionStorage.getItem('namecard_sync_state');
-        if (savedSync) {
+        const saved = sessionStorage.getItem(SYNC_STATE_KEY);
+        if (saved) {
             try {
-                const state = JSON.parse(savedSync);
-                if (state && state.isRunning && state.files && state.currentIndex < state.files.length) {
+                const state = JSON.parse(saved);
+                if (state?.isRunning && state.files && state.currentIndex < state.files.length) {
                     startOrResumeSync(true, state);
                 } else {
-                    sessionStorage.removeItem('namecard_sync_state');
+                    sessionStorage.removeItem(SYNC_STATE_KEY);
                 }
-            } catch (e) {
-                sessionStorage.removeItem('namecard_sync_state');
-            }
+            } catch { sessionStorage.removeItem(SYNC_STATE_KEY); }
         }
     }, []);
 
+    // ── Public actions ────────────────────────────────────────────────
     const handleDriveSync = () => startOrResumeSync(false, null);
 
     const handleForceReset = async () => {
-        if (confirm('実行中のすべての同期を強制キャンセルし、システムロックを解除します。よろしいですか？')) {
-            isSyncingRef.current = false;
-            setSyncing(false);
-            setShowSyncPanel(false);
-            sessionStorage.removeItem('namecard_sync_state');
-            setLogs([]);
-            setProgressStats({ total: 0, current: 0 });
-            try {
-                await fetch('/api/drive/claim?fileId=all', { method: 'DELETE' });
-                alert('すべてのシステムロックと処理中の状態を強制リセットしました。');
-            } catch (err) {
-                console.error("Lock reset failed", err);
-                alert('リセット中にエラーが発生しました。');
-            }
+        if (!confirm('実行中のすべての同期を強制キャンセルし、システムロックを解除します。よろしいですか？')) return;
+        isSyncingRef.current = false;
+        setSyncing(false);
+        setShowSyncPanel(false);
+        sessionStorage.removeItem(SYNC_STATE_KEY);
+        setLogs([]);
+        setProgressStats({ total: 0, current: 0 });
+        try {
+            await fetch('/api/drive/claim?fileId=all', { method: 'DELETE' });
+            alert('すべてのシステムロックと処理中の状態を強制リセットしました。');
+        } catch (err) {
+            console.error("Lock reset failed", err);
+            alert('リセット中にエラーが発生しました。');
         }
     };
 
+    const handleStop = () => {
+        isSyncingRef.current = false;
+        setSyncing(false);
+        setShowSyncPanel(false);
+        sessionStorage.removeItem(SYNC_STATE_KEY);
+    };
+
+    // ── Core sync loop ────────────────────────────────────────────────
     const startOrResumeSync = async (isResume = false, savedState: any = null) => {
         if (isSyncingRef.current) return;
         isSyncingRef.current = true;
@@ -150,6 +138,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             while (isSyncingRef.current) {
                 let currentState: any;
+
                 if (isResume && savedState) {
                     currentState = savedState;
                     setLogs(currentState.logs);
@@ -162,88 +151,70 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     const listRes = await fetch('/api/drive/list');
                     if (!listRes.ok) throw new Error(await listRes.text());
                     const listData = await listRes.json();
-
                     if (!listData.success) throw new Error(listData.error);
 
                     const files = listData.files || [];
                     if (files.length === 0) {
                         if (totalProcessedInSession === 0 && !hasCheckedAtLeastOnce) {
-                            alert('Googleドライブの「未登録」フォルダに新しい名刺画像がありません。\n(※ドライブ上で削除済みのデータがあれば整理されました)');
-                        } else {
-                            if (totalProcessedInSession > 0) {
-                                alert(`全ての同期・解析が完了しました！\n(このタブで処理またはスキップした合計枚数: ${totalProcessedInSession}枚)`);
-                            }
+                            alert('Googleドライブの「未登録」フォルダに新しい名刺画像がありません。');
+                        } else if (totalProcessedInSession > 0) {
+                            alert(`全ての同期・解析が完了しました！\n(処理/スキップ合計: ${totalProcessedInSession}枚)`);
                         }
                         setShowSyncPanel(false);
                         break;
                     }
 
                     hasCheckedAtLeastOnce = true;
-
-                    const initialLogs: SyncLog[] = files.map((f: any) => ({
-                        id: f.id,
-                        fileName: f.name,
-                        status: 'pending'
-                    }));
-
+                    const initialLogs: SyncLog[] = files.map((f: any) => ({ id: f.id, fileName: f.name, status: 'pending' as const }));
                     currentState = { isRunning: true, files, logs: initialLogs, currentIndex: 0, newCustomersFound: false };
                     setLogs(initialLogs);
                     setProgressStats({ total: files.length, current: 0 });
-                    sessionStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+                    sessionStorage.setItem(SYNC_STATE_KEY, JSON.stringify(currentState));
                 }
 
+                // Process each file
                 for (let i = currentState.currentIndex; i < currentState.files.length; i++) {
                     if (!isSyncingRef.current) break;
 
                     currentState.currentIndex = i;
-                    sessionStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+                    sessionStorage.setItem(SYNC_STATE_KEY, JSON.stringify(currentState));
 
                     const file = currentState.files[i];
                     setProgressStats(prev => ({ ...prev, current: i + 1 }));
                     totalProcessedInSession++;
 
                     let currentLogs = [...currentState.logs];
-                    const updateLogLocal = (status: any, extra = {}) => {
-                        const idx = currentLogs.findIndex((l: any) => l.id === file.id);
+                    const updateLog = (status: SyncLog['status'], extra: Partial<SyncLog> = {}) => {
+                        const idx = currentLogs.findIndex(l => l.id === file.id);
                         if (idx > -1) {
                             currentLogs[idx] = { ...currentLogs[idx], status, ...extra };
                             setLogs([...currentLogs]);
                             currentState.logs = currentLogs;
-                            sessionStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
+                            sessionStorage.setItem(SYNC_STATE_KEY, JSON.stringify(currentState));
                         }
                     };
 
                     try {
-                        // Try to claim file lock for parallel processing
+                        // Claim lock
                         let claimed = false;
                         try {
                             const claimRes = await fetch('/api/drive/claim', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
+                                method: 'POST', headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ fileId: file.id })
                             });
                             if (claimRes.ok) {
                                 const claimData = await claimRes.json();
-                                if (claimData.success && claimData.claimed) {
-                                    claimed = true;
-                                }
+                                if (claimData.success && claimData.claimed) claimed = true;
                             }
-                        } catch (err) {
-                            console.error("Lock error", err);
-                        }
+                        } catch (err) { console.error("Lock error", err); }
 
-                        if (!claimed) {
-                            console.log(`File ${file.name} is already claimed by another tab/session or lock failed. Skipping.`);
-                            updateLogLocal('skipped', { errorMsg: '別プロセスで処理中' });
-                            continue;
-                        }
-
+                        if (!claimed) { updateLog('skipped', { errorMsg: '別プロセスで処理中' }); continue; }
                         if (!isSyncingRef.current) break;
 
-                        updateLogLocal('downloading');
+                        // Download
+                        updateLog('downloading');
                         const dlRes = await fetch('/api/drive/download', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ fileId: file.id, fileName: file.name, mimeType: file.mimeType })
                         });
                         if (!dlRes.ok) throw new Error(await dlRes.text());
@@ -254,90 +225,31 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         const blob = await imgRes.blob();
                         const base64Data = await toBase64(blob);
 
-                        updateLogLocal('parsing');
-                        const promptText = `あなたはプロフェッショナルな名刺情報抽出・分析アシスタントです。提供された名刺画像（表裏両面が含まれている場合もあります）から、以下の情報を日本語を最優先して極めて高い精度で抽出し、指定されたJSON構造のみを出力してください。
-
-抽出と同時に、取得した総合的な情報から、相手がどのような組織・業種に属しているか、どのような役立つ接点（ビジネスチャンスなど）が持てそうか等について「AI分析コメント（150文字程度）」を作成し、\`aiAnalysis\`フィールドに格納してください。裏面の情報も加味してください。WEBサイトのURLやQRコード等があればそれも抽出してください。
-
-【重要】自社情報について：
-自社は「株式会社みみずや (https://mimizuya.co.jp/)」です。
-AI分析コメントを作成する際は、必ずこの「みみずや」と、読み取った名刺の人物・企業がどのようなビジネスの接点・シナジーがありそうか、どのような営業アプローチが有効かを推測し、相手の業種と役職に合わせてコメントとして記述してください。
-
-【重要】会社名について：
-以下はこれまでに登録された会社名のリストです。
-${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n') : '(まだ登録企業はありません)'}
-もし今回読み取った名刺の企業がこのリスト内の企業と同一であると判断できる場合（例: 株式会社の有無や配置違い、略称など）、必ず**上記リストにある正式名称と完全一致する文字列**を出力してください。
-リストにない新しい企業の場合や、リストが存在しない場合、名刺上の「(株)」や「㈱」といった略称は、必ず「株式会社」という正式名称に変換して出力してください。同様に「(有)」「㈲」は「有限会社」に、「(財)」「㈶」は「財団法人」に変換するなど、正式名称（完全な表記）として出力してください。
-
-構造:
-{ 
-  "name": "氏名", 
-  "name_romaji": "氏名のローマ字読み（名刺に明記されている場合のみ。ない場合は空文字）",
-  "company": "会社名", 
-  "department": "部署（ない場合は空文字）", 
-  "role": "役職（ない場合は空文字）", 
-  "email": "メールアドレス", 
-  "phone": "固定電話", 
-  "phone_mobile": "携帯電話", 
-  "fax": "FAX", 
-  "postal_code": "郵便番号", 
-  "prefecture": "都道府県", 
-  "city": "市区町村", 
-  "address_line1": "番地", 
-  "address_line2": "建物名や階層（ない場合は空文字）", 
-  "website": "WEBサイトURL（名刺に明記されている場合のみ）", 
-  "sns_x": "X(Twitter)アカウント（名刺に明記されている場合のみ）",
-  "sns_facebook": "Facebookアカウント（名刺に明記されている場合のみ）",
-  "sns_instagram": "Instagramアカウント（名刺に明記されている場合のみ）",
-  "sns_linkedin": "LinkedInアカウント（名刺に明記されている場合のみ）",
-  "sns_other": "その他のSNS等のURL",
-  "aiAnalysis": "AI分析コメント" 
-}
-
-条件（超重要🚨）:
-- 日本語の氏名、会社名、住所などは「名刺に書かれている文字の通り」正確に読み取ってください。
-- ローマ字での名前表記（フリガナ代わり）が名刺にある場合は、'name_romaji'として必ず抽出してください。
-- 住所、部署、役職、電話番号などは細かく適切に分割してください。
-- 企業名等のゆらぎについて：「(株)」や「㈱」といった略称が記載されている場合でも、**必ず「株式会社」という正式名称に変換して出力**してください。「(有)」は「有限会社」に統一してください。ここは絶対に守ってください。
-- **名刺に直接書かれていない情報の推測・検索補完は一切行わないでください。**存在しないSNSアカウント、適当なURL、検索結果などで空欄を埋める行為は厳禁です。該当の記載がなければ必ず「空文字("")」にしてください。
-- AI分析コメントは、名刺から得られた「客観的な事実（業種・部署・役職など）」のみから推測される、どのようなビジネスの接点になり得るかという簡潔なコメントを100文字程度で記述してください。
-- JSONフォーマット以外（説明テキストや\`\`\`jsonなどのマークダウン）は一切出力しないでください。`;
-
+                        // Parse with AI
+                        updateLog('parsing');
                         const parseRes = await fetch('/api/parse', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ prompt: promptText, base64Data, mimeType: dlData.mimeType })
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ prompt: buildParsePrompt(existingCompanies), base64Data, mimeType: dlData.mimeType })
                         });
-
                         if (!parseRes.ok) throw new Error(await parseRes.text());
                         const parseData = await parseRes.json();
                         if (!parseData.success) {
-                            if (parseData.error && parseData.error.includes && parseData.error.includes("leaked")) {
-                                throw new Error("Gemini APIキーが無効化されています。");
-                            }
+                            if (parseData.error?.includes?.("leaked")) throw new Error("Gemini APIキーが無効化されています。");
                             throw new Error(parseData.error);
                         }
                         const extracted = parseData.data;
+                        if (file.folderName) extracted.exchanger = file.folderName;
 
-                        if (file.folderName) {
-                            extracted.exchanger = file.folderName;
-                        }
-
-                        updateLogLocal('saving', { result: extracted });
-
-                        const customerData = {
-                            ...extracted,
-                            imageUrl: dlData.url,
-                            drive_file_id: file.id
-                        };
+                        // Save
+                        updateLog('saving', { result: extracted });
                         const saveRes = await fetch('/api/customers', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(customerData)
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ...extracted, imageUrl: dlData.url, drive_file_id: file.id })
                         });
                         if (!saveRes.ok) throw new Error("データベースへの保存に失敗しました");
                         const saveData = await saveRes.json();
 
+                        // Move file in Drive
                         const safeName = (extracted.name || '名前不明').replace(/[\/\\?%*:|"<>]/g, '');
                         const safeCompany = (extracted.company || '会社不明').replace(/[\/\\?%*:|"<>]/g, '');
                         const safeExchanger = (extracted.exchanger || '交換者不明').replace(/[\/\\?%*:|"<>]/g, '');
@@ -346,50 +258,40 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
                         const newFileName = `${safeExchanger}_${safeName}_${safeCompany}${duplicateTag}.${ext}`;
 
                         const moveRes = await fetch('/api/drive/move', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ fileId: file.id, newName: newFileName })
                         });
-
                         if (!moveRes.ok) {
                             const moveErr = await moveRes.json();
                             throw new Error(`ドライブ移動エラー: ${moveErr.error || 'Unknown'}`);
                         }
 
                         if (saveData.duplicate) {
-                            updateLogLocal('skipped', { errorMsg: '内容重複（取込スキップ）' });
+                            updateLog('skipped', { errorMsg: '内容重複（取込スキップ）' });
                         } else {
-                            updateLogLocal('completed');
+                            updateLog('completed');
                             currentState.newCustomersFound = true;
-
                             if (extracted.company) {
                                 setExistingCompanies(prev => prev.includes(extracted.company) ? prev : [...prev, extracted.company]);
                             }
                         }
-
-                        // 1枚完了するごとに、Dashboard側がテーブルを更新できるようタイムスタンプを更新する
                         setLatestProcessedTime(Date.now());
 
                     } catch (err: any) {
-                        console.error("File processing failed: ", file.name, err);
-                        updateLogLocal('error', { errorMsg: err.message || String(err) });
+                        console.error("File processing failed:", file.name, err);
+                        updateLog('error', { errorMsg: err.message || String(err) });
                     } finally {
-                        // Release the lock when done processing
                         fetch(`/api/drive/claim?fileId=${file.id}`, { method: 'DELETE' }).catch(console.error);
                     }
                 }
 
                 currentState.isRunning = false;
                 currentState.currentIndex = currentState.files.length;
-                sessionStorage.setItem('namecard_sync_state', JSON.stringify(currentState));
-
+                sessionStorage.setItem(SYNC_STATE_KEY, JSON.stringify(currentState));
                 setLatestProcessedTime(Date.now());
-                sessionStorage.removeItem('namecard_sync_state');
-
-                // Wait a moment for Drive moves to fully propagate before fetching the list again
+                sessionStorage.removeItem(SYNC_STATE_KEY);
                 await new Promise(resolve => setTimeout(resolve, 1500));
             }
-
         } catch (error) {
             console.error("Drive sync failed", error);
             alert("同期中にエラーが発生しました。\n" + (error as Error).message);
@@ -399,58 +301,12 @@ ${existingCompanies.length > 0 ? existingCompanies.map(c => `- ${c}`).join('\n')
         }
     };
 
+    // ── Render ─────────────────────────────────────────────────────────
     return (
         <SyncContext.Provider value={{ syncing, showSyncPanel, logs, progressStats, latestProcessedTime, handleDriveSync, handleForceReset, setShowSyncPanel }}>
             {children}
-
             {showSyncPanel && (
-                <div className="sync-overlay card animate-fade-in" style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 99999, width: 450, padding: 16, boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <h3 style={{ margin: 0, fontSize: 16 }}>クラウド同期・自動解析状況</h3>
-                        <button className="btn-secondary btn-sm" onClick={() => {
-                            isSyncingRef.current = false;
-                            setSyncing(false);
-                            setShowSyncPanel(false);
-                            sessionStorage.removeItem('namecard_sync_state');
-                        }}>
-                            {syncing ? '停止・閉じる' : '閉じる'}
-                        </button>
-                    </div>
-                    <div style={{ paddingBottom: '8px', borderBottom: '1px solid #e2e8f0', marginBottom: '8px' }}>
-                        <span style={{ fontSize: 14, fontWeight: 'bold' }}>処理中: {progressStats.current} / {progressStats.total} 枚</span>
-                    </div>
-                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                            <tbody>
-                                {logs.map(log => (
-                                    <tr key={log.id} style={{ borderBottom: '1px solid #f8fafc' }}>
-                                        <td style={{ padding: '6px', fontSize: '12px', maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={log.fileName}>
-                                            {log.fileName}
-                                        </td>
-                                        <td style={{ padding: '6px', fontSize: '12px' }}>
-                                            {log.status === 'pending' ? <span style={{ color: '#94a3b8' }}>待機中</span> :
-                                                log.status === 'skipped' ? <span style={{ color: '#cbd5e1' }}>スキップ</span> :
-                                                    log.status === 'downloading' ? <span style={{ color: '#0369a1' }}>取得中</span> :
-                                                        log.status === 'parsing' ? <span style={{ color: '#854d0e' }}>解析中</span> :
-                                                            log.status === 'saving' ? <span style={{ color: '#166534' }}>保存中</span> :
-                                                                log.status === 'completed' ? <span style={{ color: '#10b981' }}>完了</span> :
-                                                                    log.status === 'error' ? <span style={{ color: '#ef4444' }}>エラー</span> : ''}
-                                        </td>
-                                        <td style={{ padding: '6px', fontSize: '12px', color: '#334155', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {(log.status === 'error' || log.status === 'skipped') ? (
-                                                <span style={{ color: log.status === 'error' ? '#ef4444' : '#94a3b8' }} title={log.errorMsg}>{log.errorMsg}</span>
-                                            ) : log.result ? (
-                                                <span title={`${log.result.company} ${log.result.name}`}>
-                                                    <strong>{log.result.company}</strong> {log.result.name}
-                                                </span>
-                                            ) : '-'}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                <SyncPanel syncing={syncing} progressStats={progressStats} logs={logs} onStop={handleStop} />
             )}
         </SyncContext.Provider>
     );

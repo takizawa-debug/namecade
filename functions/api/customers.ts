@@ -1,9 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
+import type { DriveEnv } from './_shared/google-drive';
 
-interface Env {
-    DB: D1Database;
-    BUCKET: R2Bucket;
-}
+type Env = DriveEnv;
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
     const { results } = await context.env.DB.prepare('SELECT * FROM customers ORDER BY id DESC').all();
