@@ -1,52 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
-import jwt from '@tsndr/cloudflare-worker-jwt';
+import { DriveEnv, getAccessToken, SOURCE_FOLDER_ID, DEST_FOLDER_ID } from '../_shared/google-drive';
 
-interface Env {
-    DB: D1Database;
-    GOOGLE_CLIENT_EMAIL?: string;
-    GOOGLE_PRIVATE_KEY?: string;
-}
-
-const SOURCE_FOLDER_ID = '1bB8Rjnn2wCQ7_qndglWNATiJTihRvEvz';
-const DEST_FOLDER_ID = '1E8QzBMmGgwRMEMvX34TRJ0xNy4WCOKm9';
-
-async function getAccessToken(env: Env): Promise<string> {
-    const clientEmail = env.GOOGLE_CLIENT_EMAIL || (env as any).VITE_GOOGLE_CLIENT_EMAIL;
-    const privateKey = env.GOOGLE_PRIVATE_KEY || (env as any).VITE_GOOGLE_PRIVATE_KEY;
-
-    if (!clientEmail || !privateKey) {
-        throw new Error("Google credentials are not configured.");
-    }
-
-    const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
-
-    const iat = Math.floor(Date.now() / 1000);
-    const exp = iat + 3600;
-    const payload = {
-        iss: clientEmail,
-        scope: 'https://www.googleapis.com/auth/drive',
-        aud: 'https://oauth2.googleapis.com/token',
-        exp,
-        iat
-    };
-
-    const token = await jwt.sign(payload, formattedPrivateKey, { algorithm: 'RS256' });
-
-    const response = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${token}`
-    });
-
-    if (!response.ok) {
-        throw new Error(`Failed to get Google Access Token: ${await response.text()}`);
-    }
-
-    const data = await response.json() as { access_token: string };
-    return data.access_token;
-}
-
-export const onRequestPost: PagesFunction<Env> = async (context) => {
+export const onRequestPost: PagesFunction<DriveEnv> = async (context) => {
     try {
         const accessToken = await getAccessToken(context.env);
 
@@ -55,9 +10,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         const dbCustomers = results as { drive_file_id: string }[];
         const dbFileIds = new Set(dbCustomers.map(c => c.drive_file_id));
 
-        // 2. Fetch all valid files from Google Drive (ONLY in Dest folder)
+        // 2. Fetch all files in DEST folder
         const query = `'${DEST_FOLDER_ID}' in parents and trashed = false`;
-
         let destFilesNotInDb: string[] = [];
         let pageToken = '';
 
@@ -68,18 +22,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             listUrl.searchParams.set('supportsAllDrives', 'true');
             listUrl.searchParams.set('includeItemsFromAllDrives', 'true');
             listUrl.searchParams.set('pageSize', '1000');
-            if (pageToken) {
-                listUrl.searchParams.set('pageToken', pageToken);
-            }
+            if (pageToken) listUrl.searchParams.set('pageToken', pageToken);
 
             const listRes = await fetch(listUrl.toString(), {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             });
 
-            if (!listRes.ok) {
-                const text = await listRes.text();
-                throw new Error(`Google Drive API error: ${text}`);
-            }
+            if (!listRes.ok) throw new Error(`Google Drive API error: ${await listRes.text()}`);
 
             const data = await listRes.json() as { files: { id: string }[], nextPageToken?: string };
             data.files.forEach(f => {
@@ -91,7 +40,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             pageToken = data.nextPageToken || '';
         } while (pageToken);
 
-        // 3. Move files back to SOURCE if they are in DEST but not in DB
+        // 3. Move files back to SOURCE, removing 【重複】 tag from names
         let movedCount = 0;
         for (const fileId of destFilesNotInDb) {
             try {
@@ -100,10 +49,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
                 patchUrl.searchParams.set('removeParents', DEST_FOLDER_ID);
                 patchUrl.searchParams.set('supportsAllDrives', 'true');
 
-                // Remove the 【重複】 tag if it exists in the name
-                // To do this, we should fetch the current name first, but to save API calls in a loop we just do a blind move.
-                // Wait, if it has 【重複】 in the name, we can also rename it back.
-                // Let's first fetch the file name to rename it if needed.
+                // Fetch file name to remove 【重複】 tag if present
                 const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=name&supportsAllDrives=true`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });

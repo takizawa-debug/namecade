@@ -1,21 +1,62 @@
 import { useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { ArrowLeft, Edit2, Save, MapPin, Phone, Mail, Building, Briefcase, Calendar, Globe, Smartphone, Printer, Twitter, Facebook, Instagram, Linkedin, Link2 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './CustomerDetail.css';
 
 const MOCK_CUSTOMER = {
-    id: 0,
-    name: '',
-    company: '',
-    role: '',
-    email: '',
-    phone: '',
-    address: '',
-    segment: '',
-    addedAt: new Date().toISOString(),
-    memo: ''
+    id: 0, name: '', company: '', role: '', email: '', phone: '', address: '', segment: '', addedAt: new Date().toISOString(), memo: ''
 };
 
+// ─── Reusable field components ─────────────────────────────────────────────
+type FieldProps = {
+    icon: ReactNode;
+    label: string;
+    field: string;
+    customer: any;
+    isEditing: boolean;
+    setCustomer: (c: any) => void;
+    type?: string;
+    className?: string;
+};
+
+const InfoField = ({ icon, label, field, customer, isEditing, setCustomer, type = 'text', className = '' }: FieldProps) => (
+    <div className={`info-item ${className}`}>
+        <span className="info-label">{icon} {label}</span>
+        {isEditing ? (
+            <input type={type} className="input-field" value={customer[field] || ''} onChange={e => setCustomer({ ...customer, [field]: e.target.value })} />
+        ) : (
+            <span className="info-value">{customer[field] || ''}</span>
+        )}
+    </div>
+);
+
+type LinkFieldProps = FieldProps & {
+    urlPrefix: string;
+    displayPrefix?: string;
+};
+
+const LinkField = ({ icon, label, field, customer, isEditing, setCustomer, urlPrefix, displayPrefix = '' }: LinkFieldProps) => (
+    <div className="info-item">
+        <span className="info-label">{icon} {label}</span>
+        {isEditing ? (
+            <input type="text" className="input-field" value={customer[field] || ''} onChange={e => setCustomer({ ...customer, [field]: e.target.value })} />
+        ) : (
+            <span className="info-value">
+                {customer[field] ? (
+                    <a
+                        href={customer[field].startsWith('http') ? customer[field] : `${urlPrefix}${customer[field]}`}
+                        target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)' }}
+                    >
+                        {customer[field].startsWith('http') ? 'リンクを開く' : `${displayPrefix}${customer[field]}`}
+                    </a>
+                ) : ''}
+            </span>
+        )}
+    </div>
+);
+
+// ─── Main Component ────────────────────────────────────────────────────────
 const CustomerDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -27,14 +68,8 @@ const CustomerDetail = () => {
         if (!id) return;
         fetch(`/api/customers/${id}`)
             .then(res => res.json())
-            .then(data => {
-                setCustomer(data);
-                setLoading(false);
-            })
-            .catch(err => {
-                console.error('Failed to load detail', err);
-                setLoading(false);
-            });
+            .then(data => { setCustomer(data); setLoading(false); })
+            .catch(err => { console.error('Failed to load detail', err); setLoading(false); });
     }, [id]);
 
     const handleSave = async () => {
@@ -50,56 +85,37 @@ const CustomerDetail = () => {
         }
     };
 
-    const handleBack = () => {
-        navigate('/dashboard');
-    };
-
     if (loading) return <div className="customer-detail-page text-center"><p>読み込み中...</p></div>;
+
+    // Shared props passed to every field component
+    const fp = { customer, isEditing, setCustomer };
 
     return (
         <div className="customer-detail-page animate-fade-in">
             <header className="page-header sticky-header">
                 <div className="header-actions">
-                    <button className="btn-secondary btn-icon" onClick={handleBack}>
+                    <button className="btn-secondary btn-icon" onClick={() => navigate('/dashboard')}>
                         <ArrowLeft size={18} /> 戻る
                     </button>
-                    <div className="header-titles">
-                        <h2>顧客詳細</h2>
-                    </div>
+                    <div className="header-titles"><h2>顧客詳細</h2></div>
                 </div>
                 <div>
                     {isEditing ? (
-                        <button className="btn-primary" onClick={handleSave}>
-                            <Save size={18} /> 変更を保存
-                        </button>
+                        <button className="btn-primary" onClick={handleSave}><Save size={18} /> 変更を保存</button>
                     ) : (
-                        <button className="btn-secondary" onClick={() => setIsEditing(true)}>
-                            <Edit2 size={18} /> 情報を編集
-                        </button>
+                        <button className="btn-secondary" onClick={() => setIsEditing(true)}><Edit2 size={18} /> 情報を編集</button>
                     )}
                 </div>
             </header>
 
             <div className="profile-layout">
+                {/* ── Sidebar ── */}
                 <div className="card profile-sidebar">
                     <div className="profile-main-info">
                         {isEditing ? (
                             <>
-                                <input
-                                    type="text"
-                                    className="input-field text-center font-bold"
-                                    value={customer.name}
-                                    placeholder="氏名"
-                                    onChange={e => setCustomer({ ...customer, name: e.target.value })}
-                                />
-                                <input
-                                    type="text"
-                                    className="input-field text-center mt-2"
-                                    value={customer.name_romaji || ''}
-                                    placeholder="ローマ字表記"
-                                    onChange={e => setCustomer({ ...customer, name_romaji: e.target.value })}
-                                    style={{ marginTop: '8px' }}
-                                />
+                                <input type="text" className="input-field text-center font-bold" value={customer.name} placeholder="氏名" onChange={e => setCustomer({ ...customer, name: e.target.value })} />
+                                <input type="text" className="input-field text-center mt-2" value={customer.name_romaji || ''} placeholder="ローマ字表記" onChange={e => setCustomer({ ...customer, name_romaji: e.target.value })} style={{ marginTop: '8px' }} />
                             </>
                         ) : (
                             <>
@@ -107,81 +123,29 @@ const CustomerDetail = () => {
                                 {customer.name_romaji && <p className="text-muted text-sm">{customer.name_romaji}</p>}
                             </>
                         )}
-
                         <p className="profile-subtitle" style={{ marginTop: '8px' }}>{customer.role} at {customer.company}</p>
                         <span className="badge mt-2">{customer.segment}</span>
                     </div>
-
                     <div className="profile-quick-actions">
-                        <a href={`mailto:${customer.email}`} className="action-btn">
-                            <Mail size={16} /> メール
-                        </a>
-                        <a href={`tel:${customer.phone}`} className="action-btn">
-                            <Phone size={16} /> 電話
-                        </a>
+                        <a href={`mailto:${customer.email}`} className="action-btn"><Mail size={16} /> メール</a>
+                        <a href={`tel:${customer.phone}`} className="action-btn"><Phone size={16} /> 電話</a>
                     </div>
                 </div>
 
+                {/* ── Content ── */}
                 <div className="profile-content">
                     <div className="card info-section">
                         <h4 className="section-title">連絡先情報</h4>
                         <div className="info-grid">
-                            <div className="info-item">
-                                <span className="info-label"><Building size={16} /> 会社名</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.company} onChange={e => setCustomer({ ...customer, company: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.company}</span>
-                                )}
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label"><Building size={16} /> 部署</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.department || ''} onChange={e => setCustomer({ ...customer, department: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.department || ''}</span>
-                                )}
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label"><Briefcase size={16} /> 役職</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.role} onChange={e => setCustomer({ ...customer, role: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.role}</span>
-                                )}
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label"><Mail size={16} /> メールアドレス</span>
-                                {isEditing ? (
-                                    <input type="email" className="input-field" value={customer.email} onChange={e => setCustomer({ ...customer, email: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.email}</span>
-                                )}
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label"><Phone size={16} /> 固定電話</span>
-                                {isEditing ? (
-                                    <input type="tel" className="input-field" value={customer.phone} onChange={e => setCustomer({ ...customer, phone: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.phone}</span>
-                                )}
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label"><Smartphone size={16} /> 携帯電話</span>
-                                {isEditing ? (
-                                    <input type="tel" className="input-field" value={customer.phone_mobile || ''} onChange={e => setCustomer({ ...customer, phone_mobile: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.phone_mobile || ''}</span>
-                                )}
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label"><Printer size={16} /> FAX</span>
-                                {isEditing ? (
-                                    <input type="tel" className="input-field" value={customer.fax || ''} onChange={e => setCustomer({ ...customer, fax: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.fax || ''}</span>
-                                )}
-                            </div>
+                            <InfoField icon={<Building size={16} />} label="会社名" field="company" {...fp} />
+                            <InfoField icon={<Building size={16} />} label="部署" field="department" {...fp} />
+                            <InfoField icon={<Briefcase size={16} />} label="役職" field="role" {...fp} />
+                            <InfoField icon={<Mail size={16} />} label="メールアドレス" field="email" {...fp} type="email" />
+                            <InfoField icon={<Phone size={16} />} label="固定電話" field="phone" {...fp} type="tel" />
+                            <InfoField icon={<Smartphone size={16} />} label="携帯電話" field="phone_mobile" {...fp} type="tel" />
+                            <InfoField icon={<Printer size={16} />} label="FAX" field="fax" {...fp} type="tel" />
+
+                            {/* Website (special: clickable link in view mode) */}
                             <div className="info-item">
                                 <span className="info-label"><Globe size={16} /> WEBサイト</span>
                                 {isEditing ? (
@@ -194,170 +158,36 @@ const CustomerDetail = () => {
                                     </span>
                                 )}
                             </div>
-                            <div className="info-item">
-                                <span className="info-label"><Twitter size={16} /> X(Twitter)</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.sns_x || ''} onChange={e => setCustomer({ ...customer, sns_x: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">
-                                        {customer.sns_x ? (
-                                            <a href={customer.sns_x.startsWith('http') ? customer.sns_x : `https://x.com/${customer.sns_x}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)' }}>
-                                                {customer.sns_x.startsWith('http') ? 'リンクを開く' : `@${customer.sns_x}`}
-                                            </a>
-                                        ) : ''}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label"><Facebook size={16} /> Facebook</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.sns_facebook || ''} onChange={e => setCustomer({ ...customer, sns_facebook: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">
-                                        {customer.sns_facebook ? (
-                                            <a href={customer.sns_facebook.startsWith('http') ? customer.sns_facebook : `https://facebook.com/${customer.sns_facebook}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)' }}>
-                                                {customer.sns_facebook.startsWith('http') ? 'リンクを開く' : customer.sns_facebook}
-                                            </a>
-                                        ) : ''}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label"><Instagram size={16} /> Instagram</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.sns_instagram || ''} onChange={e => setCustomer({ ...customer, sns_instagram: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">
-                                        {customer.sns_instagram ? (
-                                            <a href={customer.sns_instagram.startsWith('http') ? customer.sns_instagram : `https://instagram.com/${customer.sns_instagram}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)' }}>
-                                                {customer.sns_instagram.startsWith('http') ? 'リンクを開く' : `@${customer.sns_instagram}`}
-                                            </a>
-                                        ) : ''}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label"><Linkedin size={16} /> LinkedIn</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.sns_linkedin || ''} onChange={e => setCustomer({ ...customer, sns_linkedin: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">
-                                        {customer.sns_linkedin ? (
-                                            <a href={customer.sns_linkedin.startsWith('http') ? customer.sns_linkedin : `https://linkedin.com/in/${customer.sns_linkedin}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)' }}>
-                                                {customer.sns_linkedin.startsWith('http') ? 'リンクを開く' : customer.sns_linkedin}
-                                            </a>
-                                        ) : ''}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label"><Link2 size={16} /> その他SNS等</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.sns_other || ''} onChange={e => setCustomer({ ...customer, sns_other: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">
-                                        {customer.sns_other ? (
-                                            <a href={customer.sns_other.startsWith('http') ? customer.sns_other : `https://${customer.sns_other}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)' }}>
-                                                {customer.sns_other.startsWith('http') ? 'リンクを開く' : customer.sns_other}
-                                            </a>
-                                        ) : ''}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label"><MapPin size={16} /> 郵便番号</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.postal_code || ''} onChange={e => setCustomer({ ...customer, postal_code: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.postal_code || ''}</span>
-                                )}
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label"><MapPin size={16} /> 都道府県</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.prefecture || ''} onChange={e => setCustomer({ ...customer, prefecture: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.prefecture || ''}</span>
-                                )}
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label"><MapPin size={16} /> 市区町村</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.city || ''} onChange={e => setCustomer({ ...customer, city: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.city || ''}</span>
-                                )}
-                            </div>
-                            <div className="info-item full-width">
-                                <span className="info-label"><MapPin size={16} /> 番地</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.address_line1 || ''} onChange={e => setCustomer({ ...customer, address_line1: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.address_line1 || ''}</span>
-                                )}
-                            </div>
-                            <div className="info-item full-width">
-                                <span className="info-label"><MapPin size={16} /> 建物名・階層</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.address_line2 || ''} onChange={e => setCustomer({ ...customer, address_line2: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.address_line2 || ''}</span>
-                                )}
-                            </div>
-                            {/* 結合した元の住所は閲覧用には出さず細分化したものを優先 または フォールバックとして表示 */}
+
+                            <LinkField icon={<Twitter size={16} />} label="X(Twitter)" field="sns_x" urlPrefix="https://x.com/" displayPrefix="@" {...fp} />
+                            <LinkField icon={<Facebook size={16} />} label="Facebook" field="sns_facebook" urlPrefix="https://facebook.com/" {...fp} />
+                            <LinkField icon={<Instagram size={16} />} label="Instagram" field="sns_instagram" urlPrefix="https://instagram.com/" displayPrefix="@" {...fp} />
+                            <LinkField icon={<Linkedin size={16} />} label="LinkedIn" field="sns_linkedin" urlPrefix="https://linkedin.com/in/" {...fp} />
+                            <LinkField icon={<Link2 size={16} />} label="その他SNS等" field="sns_other" urlPrefix="https://" {...fp} />
+
+                            <InfoField icon={<MapPin size={16} />} label="郵便番号" field="postal_code" {...fp} />
+                            <InfoField icon={<MapPin size={16} />} label="都道府県" field="prefecture" {...fp} />
+                            <InfoField icon={<MapPin size={16} />} label="市区町村" field="city" {...fp} />
+                            <InfoField icon={<MapPin size={16} />} label="番地" field="address_line1" {...fp} className="full-width" />
+                            <InfoField icon={<MapPin size={16} />} label="建物名・階層" field="address_line2" {...fp} className="full-width" />
+
                             {(customer.address && !customer.address_line1) && (
-                                <div className="info-item full-width">
-                                    <span className="info-label"><MapPin size={16} /> 旧住所データ</span>
-                                    {isEditing ? (
-                                        <input type="text" className="input-field" value={customer.address || ''} onChange={e => setCustomer({ ...customer, address: e.target.value })} />
-                                    ) : (
-                                        <span className="info-value">{customer.address || ''}</span>
-                                    )}
-                                </div>
+                                <InfoField icon={<MapPin size={16} />} label="旧住所データ" field="address" {...fp} className="full-width" />
                             )}
                         </div>
                     </div>
 
                     <div className="card info-section">
                         <h4 className="section-title">追加情報</h4>
-
                         <div className="info-grid single-col">
-                            <div className="info-item">
-                                <span className="info-label">事業区分</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.business_category || ''} onChange={e => setCustomer({ ...customer, business_category: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.business_category || ''}</span>
-                                )}
-                            </div>
-
-                            <div className="info-item">
-                                <span className="info-label">タグ</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.tags || ''} onChange={e => setCustomer({ ...customer, tags: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.tags || ''}</span>
-                                )}
-                            </div>
-
-                            <div className="info-item">
-                                <span className="info-label">交換者</span>
-                                {isEditing ? (
-                                    <input type="text" className="input-field" value={customer.exchanger || ''} onChange={e => setCustomer({ ...customer, exchanger: e.target.value })} />
-                                ) : (
-                                    <span className="info-value">{customer.exchanger || ''}</span>
-                                )}
-                            </div>
+                            <InfoField icon={null} label="事業区分" field="business_category" {...fp} />
+                            <InfoField icon={null} label="タグ" field="tags" {...fp} />
+                            <InfoField icon={null} label="交換者" field="exchanger" {...fp} />
 
                             <div className="info-item">
                                 <span className="info-label">メモ・特記事項</span>
                                 {isEditing ? (
-                                    <textarea
-                                        className="input-field"
-                                        rows={4}
-                                        value={customer.memo}
-                                        onChange={e => setCustomer({ ...customer, memo: e.target.value })}
-                                    />
+                                    <textarea className="input-field" rows={4} value={customer.memo} onChange={e => setCustomer({ ...customer, memo: e.target.value })} />
                                 ) : (
                                     <p className="info-value memo-text">{customer.memo}</p>
                                 )}
@@ -366,20 +196,13 @@ const CustomerDetail = () => {
                             <div className="info-item">
                                 <span className="info-label">AI分析コメント</span>
                                 {isEditing ? (
-                                    <textarea
-                                        className="input-field"
-                                        rows={4}
-                                        value={customer.ai_analysis || ''}
-                                        onChange={e => setCustomer({ ...customer, ai_analysis: e.target.value })}
-                                    />
+                                    <textarea className="input-field" rows={4} value={customer.ai_analysis || ''} onChange={e => setCustomer({ ...customer, ai_analysis: e.target.value })} />
                                 ) : (
                                     <p className="info-value memo-text" style={{ fontStyle: 'italic', backgroundColor: 'var(--surface-color-subtle)', padding: '10px', borderRadius: '8px' }}>
                                         {customer.ai_analysis || '分析コメントはありません'}
                                     </p>
                                 )}
                             </div>
-
-
 
                             <div className="info-item">
                                 <span className="info-label"><Calendar size={16} /> 登録日</span>
