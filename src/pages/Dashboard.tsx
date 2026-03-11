@@ -325,7 +325,17 @@ const Dashboard = () => {
                         </div>
                         <div style={{ marginBottom: '12px' }}>
                             <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' }}>交換者</label>
-                            <input type="text" className="input-field" value={bulkEditData.exchanger} onChange={e => setBulkEditData({ ...bulkEditData, exchanger: e.target.value })} placeholder="変更後の交換者" />
+                            <select 
+                                className="input-field" 
+                                value={bulkEditData.exchanger} 
+                                onChange={e => setBulkEditData({ ...bulkEditData, exchanger: e.target.value })}
+                                style={{ width: '100%', padding: '8px', cursor: 'pointer' }}
+                            >
+                                <option value="">-- 変更しない --</option>
+                                {Array.from(new Set(customers.map((c: any) => c.exchanger).filter(Boolean))).map((exchanger: any, idx) => (
+                                    <option key={idx} value={exchanger}>{exchanger}</option>
+                                ))}
+                            </select>
                         </div>
                         <div style={{ marginBottom: '24px' }}>
                             <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', fontWeight: 'bold' }}>追加日</label>
