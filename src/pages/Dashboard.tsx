@@ -74,23 +74,27 @@ const Dashboard = () => {
             });
     };
 
-    const handleRestoreSkipped = async () => {
-        if (!confirm('「完了済フォルダ」にあってシステムに登録されていない（スキップされた）名刺をすべて「未処理フォルダ」に戻します。よろしいですか？')) return;
+    const handleMergeDuplicates = async () => {
+        if (!confirm('交換者、会社名、氏名（またはローマ字）が一致する重複データを統合し、古いデータをメインにして新しいデータを削除します。よろしいですか？')) return;
 
+        setLoading(true);
         try {
-            const res = await fetch('/api/drive/restore-skipped', { method: 'POST' });
+            const res = await fetch('/api/customers/merge-duplicates', { method: 'POST' });
             if (!res.ok) {
                 const errorText = await res.text();
                 throw new Error(errorText);
             }
             const data = await res.json();
             if (data.success) {
-                alert(`処理が完了しました。${data.movedCount}件の名刺を未処理状態に戻しました。`);
+                alert(`処理が完了しました。${data.mergedCount}件の重複グループを統合し、${data.deletedCount}件の不要なデータを削除しました。`);
+                fetchCustomers();
             } else {
                 throw new Error(data.error || '不明なエラー');
             }
         } catch (err: any) {
             alert(`エラーが発生しました: ${err.message}`);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -258,8 +262,8 @@ const Dashboard = () => {
                     <p className="subtitle">名刺と顧客情報を管理・整理します</p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className="btn-secondary" onClick={handleRestoreSkipped} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a', borderColor: '#dcfce3', backgroundColor: '#f0fdf4' }} title="スキップされた名刺を未登録フォルダに戻します">
-                        未処理へ戻す
+                    <button className="btn-secondary" onClick={handleMergeDuplicates} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b45309', borderColor: '#fde68a', backgroundColor: '#fef3c7' }} title="重複している名刺の情報を統合し、不要なデータを削除します">
+                        重複統合
                     </button>
                     <button className="btn-secondary" onClick={handleForceReset} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', borderColor: '#fee2e2', backgroundColor: '#fef2f2' }} title="同期が止まらない場合やロックを強制解除します">
                         強制リセット

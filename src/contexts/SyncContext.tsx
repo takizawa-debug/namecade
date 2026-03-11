@@ -167,29 +167,6 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                     const files = listData.files || [];
                     if (files.length === 0) {
-                        let movedFiles = 0;
-                        try {
-                            const cleanupRes = await fetch('/api/drive/cleanup', { method: 'POST' });
-                            if (cleanupRes.ok) {
-                                const cleanupData = await cleanupRes.json();
-                                if (cleanupData.success && cleanupData.deletedCount > 0) {
-                                    console.log(`Cleaned up ${cleanupData.deletedCount} orphaned rows.`);
-                                    setLatestProcessedTime(Date.now()); // trigger refresh on dashboard
-                                }
-                                if (cleanupData.success && cleanupData.movedCount > 0) {
-                                    console.log(`Moved ${cleanupData.movedCount} unmapped files back to source.`);
-                                    movedFiles = cleanupData.movedCount;
-                                }
-                            }
-                        } catch (e) {
-                            console.error("Cleanup failed", e);
-                        }
-
-                        if (movedFiles > 0) {
-                            // If files were moved from DEST to SOURCE, loop again immediately to process them
-                            continue;
-                        }
-
                         if (totalProcessedInSession === 0 && !hasCheckedAtLeastOnce) {
                             alert('Googleドライブの「未登録」フォルダに新しい名刺画像がありません。\n(※ドライブ上で削除済みのデータがあれば整理されました)');
                         } else {
