@@ -1,10 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
+import type { DriveEnv } from './_shared/google-drive';
 
-interface Env {
-    GEMINI_API_KEY?: string;
-    DB: D1Database;
-    BUCKET: R2Bucket;
-}
+type Env = DriveEnv;
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
     try {

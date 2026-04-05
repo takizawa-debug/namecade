@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useRef } from 'react';
 import SyncPanel from '../components/SyncPanel';
 import { buildParsePrompt } from '../constants/ai-prompt';
+import { customersApi, driveApi, parseApi } from '../lib/api';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 export interface SyncLog {
@@ -76,11 +77,10 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // ── Initial load + resume ─────────────────────────────────────────
     useEffect(() => {
-        fetch('/api/customers')
-            .then(res => res.json())
+        customersApi.getAll()
             .then(data => {
                 if (Array.isArray(data)) {
-                    setExistingCompanies([...new Set(data.map((c: any) => c.company).filter(Boolean))] as string[]);
+                    setExistingCompanies([...new Set(data.map(c => c.company).filter(Boolean))]);
                 }
             })
             .catch(console.error);
@@ -110,7 +110,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLogs([]);
         setProgressStats({ total: 0, current: 0 });
         try {
-            await fetch('/api/drive/claim?fileId=all', { method: 'DELETE' });
+            await driveApi.releaseAllClaims();
             alert('すべてのシステムロックと処理中の状態を強制リセットしました。');
         } catch (err) {
             console.error("Lock reset failed", err);
@@ -148,9 +148,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     setLogs([]);
                     setProgressStats({ total: 0, current: totalProcessedInSession });
 
-                    const listRes = await fetch('/api/drive/list');
-                    if (!listRes.ok) throw new Error(await listRes.text());
-                    const listData = await listRes.json();
+                    const listData = await driveApi.list();
                     if (!listData.success) throw new Error(listData.error);
 
                     const files = listData.files || [];
@@ -198,14 +196,8 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         // Claim lock
                         let claimed = false;
                         try {
-                            const claimRes = await fetch('/api/drive/claim', {
-                                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ fileId: file.id })
-                            });
-                            if (claimRes.ok) {
-                                const claimData = await claimRes.json();
-                                if (claimData.success && claimData.claimed) claimed = true;
-                            }
+                            const claimData = await driveApi.claim(file.id);
+                            if (claimData.success && claimData.claimed) claimed = true;
                         } catch (err) { console.error("Lock error", err); }
 
                         if (!claimed) { updateLog('skipped', { errorMsg: '別プロセスで処理中' }); continue; }
@@ -213,12 +205,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                         // Download
                         updateLog('downloading');
-                        const dlRes = await fetch('/api/drive/download', {
-                            method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ fileId: file.id, fileName: file.name, mimeType: file.mimeType })
-                        });
-                        if (!dlRes.ok) throw new Error(await dlRes.text());
-                        const dlData = await dlRes.json();
+                        const dlData = await driveApi.download(file.id, file.name, file.mimeType);
                         if (!dlData.success) throw new Error(dlData.error);
 
                         const imgRes = await fetch(dlData.url);
@@ -227,27 +214,19 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                         // Parse with AI
                         updateLog('parsing');
-                        const parseRes = await fetch('/api/parse', {
-                            method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ prompt: buildParsePrompt(existingCompanies), base64Data, mimeType: dlData.mimeType })
-                        });
-                        if (!parseRes.ok) throw new Error(await parseRes.text());
-                        const parseData = await parseRes.json();
+                        const parseData = await parseApi.parse(buildParsePrompt(existingCompanies), base64Data, dlData.mimeType);
                         if (!parseData.success) {
                             if (parseData.error?.includes?.("leaked")) throw new Error("Gemini APIキーが無効化されています。");
                             throw new Error(parseData.error);
                         }
                         const extracted = parseData.data;
+                        if (!extracted) throw new Error('AI解析結果が空です');
                         if (file.folderName) extracted.exchanger = file.folderName;
 
                         // Save
                         updateLog('saving', { result: extracted });
-                        const saveRes = await fetch('/api/customers', {
-                            method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ ...extracted, imageUrl: dlData.url, drive_file_id: file.id })
-                        });
-                        if (!saveRes.ok) throw new Error("データベースへの保存に失敗しました");
-                        const saveData = await saveRes.json();
+                        const saveData = await customersApi.create({ ...extracted, imageUrl: dlData.url, drive_file_id: file.id });
+                        if (!saveData.success) throw new Error('データベースへの保存に失敗しました');
 
                         // Move file in Drive
                         const safeName = (extracted.name || '名前不明').replace(/[\/\\?%*:|"<>]/g, '');
@@ -257,13 +236,9 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         const duplicateTag = saveData.duplicate ? '【重複】' : '';
                         const newFileName = `${safeExchanger}_${safeName}_${safeCompany}${duplicateTag}.${ext}`;
 
-                        const moveRes = await fetch('/api/drive/move', {
-                            method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ fileId: file.id, newName: newFileName })
-                        });
-                        if (!moveRes.ok) {
-                            const moveErr = await moveRes.json();
-                            throw new Error(`ドライブ移動エラー: ${moveErr.error || 'Unknown'}`);
+                        const moveResult = await driveApi.move(file.id, newFileName);
+                        if (!moveResult.success) {
+                            throw new Error(`ドライブ移動エラー: ${moveResult.error || 'Unknown'}`);
                         }
 
                         if (saveData.duplicate) {
@@ -281,7 +256,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         console.error("File processing failed:", file.name, err);
                         updateLog('error', { errorMsg: err.message || String(err) });
                     } finally {
-                        fetch(`/api/drive/claim?fileId=${file.id}`, { method: 'DELETE' }).catch(console.error);
+                        driveApi.releaseClaim(file.id).catch(console.error);
                     }
                 }
 

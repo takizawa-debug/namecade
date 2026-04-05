@@ -2,10 +2,17 @@ import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowLeft, Edit2, Save, MapPin, Phone, Mail, Building, Briefcase, Calendar, Globe, Smartphone, Printer, Twitter, Facebook, Instagram, Linkedin, Link2 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { customersApi } from '../lib/api';
+import type { Customer } from '../types/customer';
 import './CustomerDetail.css';
 
-const MOCK_CUSTOMER = {
-    id: 0, name: '', company: '', role: '', email: '', phone: '', address: '', segment: '', addedAt: new Date().toISOString(), memo: ''
+const EMPTY_CUSTOMER: Customer = {
+    id: 0, name: '', name_romaji: '', company: '', department: '', role: '',
+    email: '', phone: '', phone_mobile: '', fax: '', address: '',
+    postal_code: '', prefecture: '', city: '', address_line1: '', address_line2: '',
+    website: '', sns_x: '', sns_facebook: '', sns_instagram: '', sns_linkedin: '', sns_other: '',
+    exchanger: '', business_category: '', tags: '', memo: '', image_url: '', ai_analysis: '',
+    drive_file_id: '', added_at: new Date().toISOString(),
 };
 
 // ─── Reusable field components ─────────────────────────────────────────────
@@ -61,24 +68,19 @@ const CustomerDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [isEditing, setIsEditing] = useState(false);
-    const [customer, setCustomer] = useState<any>(MOCK_CUSTOMER);
+    const [customer, setCustomer] = useState<Customer>(EMPTY_CUSTOMER);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!id) return;
-        fetch(`/api/customers/${id}`)
-            .then(res => res.json())
+        customersApi.getById(Number(id))
             .then(data => { setCustomer(data); setLoading(false); })
             .catch(err => { console.error('Failed to load detail', err); setLoading(false); });
     }, [id]);
 
     const handleSave = async () => {
         try {
-            await fetch(`/api/customers/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(customer)
-            });
+            await customersApi.update(Number(id), customer);
             setIsEditing(false);
         } catch (e) {
             console.error('Save failed', e);
@@ -124,7 +126,7 @@ const CustomerDetail = () => {
                             </>
                         )}
                         <p className="profile-subtitle" style={{ marginTop: '8px' }}>{customer.role} at {customer.company}</p>
-                        <span className="badge mt-2">{customer.segment}</span>
+                        <span className="badge mt-2">{customer.business_category}</span>
                     </div>
                     <div className="profile-quick-actions">
                         <a href={`mailto:${customer.email}`} className="action-btn"><Mail size={16} /> メール</a>

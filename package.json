@@ -1,31 +1,28 @@
 {
   "name": "namecard",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "deploy": "npm run build && npx wrangler pages deploy dist --project-name namecade --branch main",
+    "db:execute": "npx wrangler d1 execute namecade-db --file=schema.sql"
   },
   "dependencies": {
     "@tsndr/cloudflare-worker-jwt": "^3.2.1",
-    "@zxing/browser": "^0.1.5",
-    "@zxing/library": "^0.21.3",
-    "clsx": "^2.1.1",
-    "jspdf": "^4.2.0",
     "lucide-react": "^0.577.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-image-crop": "^11.0.10",
-    "react-router-dom": "^7.13.1",
-    "react-webcam": "^7.2.0",
-    "tailwind-merge": "^3.5.0"
+    "react-router-dom": "^7.13.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260307.1",
     "@eslint/js": "^9.25.0",
+    "@types/node": "^25.5.2",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",

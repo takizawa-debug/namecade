@@ -1,9 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
+import type { DriveEnv } from '../_shared/google-drive';
 
-interface Env {
-    DB: D1Database;
-    BUCKET: R2Bucket;
-}
+type Env = DriveEnv;
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
     const id = context.params.id;

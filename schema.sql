@@ -1,6 +1,7 @@
-DROP TABLE IF EXISTS customers;
+-- NameCard Database Schema
+-- Applied via: npm run db:execute
 
-CREATE TABLE customers (
+CREATE TABLE IF NOT EXISTS customers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   company TEXT,
@@ -29,6 +30,7 @@ CREATE TABLE customers (
   memo TEXT,
   image_url TEXT,
   ai_analysis TEXT,
+  drive_file_id TEXT,
   added_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -36,7 +38,12 @@ CREATE TABLE IF NOT EXISTS scans (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   file_name TEXT NOT NULL,
   image_url TEXT NOT NULL,
-  status TEXT DEFAULT 'pending', -- 'pending' | 'completed' | 'error'
+  status TEXT DEFAULT 'pending',  -- 'pending' | 'completed' | 'error'
   customer_id INTEGER,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS file_locks (
+  file_id TEXT PRIMARY KEY,
+  locked_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

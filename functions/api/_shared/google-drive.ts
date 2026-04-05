@@ -3,9 +3,10 @@ import jwt from '@tsndr/cloudflare-worker-jwt';
 
 export interface DriveEnv {
     DB: D1Database;
-    BUCKET?: R2Bucket;
+    BUCKET: R2Bucket;
     GOOGLE_CLIENT_EMAIL?: string;
     GOOGLE_PRIVATE_KEY?: string;
+    GEMINI_API_KEY?: string;
 }
 
 export const SOURCE_FOLDER_ID = '1bB8Rjnn2wCQ7_qndglWNATiJTihRvEvz';

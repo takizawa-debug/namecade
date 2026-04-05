@@ -1,60 +1,43 @@
-import { useState, useEffect, useContext, useMemo } from 'react';
+import { useState } from 'react';
 import { Search, Trash, Cloud, Loader } from 'lucide-react';
-import { SyncContext } from '../contexts/SyncContext';
+import { useSync } from '../hooks/useSync';
+import { useCustomers, useFilteredCustomers } from '../hooks/useCustomers';
+import { customersApi } from '../lib/api';
 import CustomerTable from '../components/CustomerTable';
 import BulkEditModal from '../components/BulkEditModal';
+import type { Customer, SortConfig, FilterState } from '../types/customer';
 import './Dashboard.css';
 
 const Dashboard = () => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [customers, setCustomers] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
-
-    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
-    const [filters, setFilters] = useState<Record<string, string>>({});
+    const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+    const [filters, setFilters] = useState<FilterState>({});
     const [showBulkEdit, setShowBulkEdit] = useState(false);
     const [bulkEditData, setBulkEditData] = useState({ business_category: '', tags: '', exchanger: '', added_at: '' });
     const [editingId, setEditingId] = useState<number | null>(null);
-    const [editData, setEditData] = useState<any>({});
+    const [editData, setEditData] = useState<Partial<Customer>>({});
     const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
 
-    const syncCtx = useContext(SyncContext);
-    const { syncing, progressStats, latestProcessedTime, handleDriveSync, handleForceReset } = syncCtx || {
-        syncing: false, progressStats: { total: 0, current: 0 }, latestProcessedTime: Date.now(),
-        handleDriveSync: () => {}, handleForceReset: () => {}
-    };
-
-    useEffect(() => { fetchCustomers(); }, [latestProcessedTime]);
-
-    const fetchCustomers = () => {
-        fetch('/api/customers')
-            .then(res => res.json())
-            .then(data => { setCustomers(Array.isArray(data) ? data : []); setLoading(false); })
-            .catch(err => { console.error('Failed to fetch customers:', err); setLoading(false); });
-    };
-
-    const exchangerOptions = useMemo(() =>
-        Array.from(new Set(customers.map((c: any) => c.exchanger).filter(Boolean))) as string[]
-    , [customers]);
+    const { syncing, progressStats, latestProcessedTime, handleDriveSync, handleForceReset } = useSync();
+    const { customers, loading, setLoading, fetchCustomers, exchangerOptions } = useCustomers({ refreshTrigger: latestProcessedTime });
+    const filteredCustomers = useFilteredCustomers(customers, searchTerm, filters, showDuplicatesOnly, sortConfig);
 
     // ─── Actions ────────────────────────────────────────────────────
     const handleMergeDuplicates = async () => {
         if (!confirm('交換者、会社名、氏名（またはローマ字）が一致する重複データを統合し、古いデータをメインにして新しいデータを削除します。よろしいですか？')) return;
         setLoading(true);
         try {
-            const res = await fetch('/api/customers/merge-duplicates', { method: 'POST' });
-            if (!res.ok) throw new Error(await res.text());
-            const data = await res.json();
+            const data = await customersApi.mergeDuplicates();
             if (data.success) {
                 alert(`処理が完了しました。${data.mergedCount}件の重複グループを統合し、${data.deletedCount}件の不要なデータを削除しました。`);
                 fetchCustomers();
             } else {
                 throw new Error(data.error || '不明なエラー');
             }
-        } catch (err: any) {
-            alert(`エラーが発生しました: ${err.message}`);
+        } catch (err: unknown) {
+            alert(`エラーが発生しました: ${err instanceof Error ? err.message : String(err)}`);
         } finally { setLoading(false); }
     };
 
@@ -63,7 +46,7 @@ const Dashboard = () => {
         if (!window.confirm(`${selectedIds.length}件の連絡先を削除しますか？`)) return;
         setLoading(true);
         try {
-            for (const id of selectedIds) await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+            for (const id of selectedIds) await customersApi.delete(id);
             setSelectedIds([]); fetchCustomers();
         } catch (error) {
             console.error("Delete failed", error); alert("削除中にエラーが発生しました。"); setLoading(false);
@@ -74,18 +57,14 @@ const Dashboard = () => {
         if (selectedIds.length === 0) return;
         setLoading(true);
         try {
-            const dataToUpdate: any = {};
+            const dataToUpdate: Record<string, string> = {};
             if (bulkEditData.business_category.trim()) dataToUpdate.business_category = bulkEditData.business_category.trim();
             if (bulkEditData.tags.trim()) dataToUpdate.tags = bulkEditData.tags.trim();
             if (bulkEditData.exchanger.trim()) dataToUpdate.exchanger = bulkEditData.exchanger.trim();
             if (bulkEditData.added_at.trim()) dataToUpdate.added_at = bulkEditData.added_at.trim();
             if (Object.keys(dataToUpdate).length === 0) { alert("編集する項目を入力してください。"); setLoading(false); return; }
 
-            const res = await fetch('/api/customers/bulk', {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids: selectedIds, data: dataToUpdate })
-            });
-            if (!res.ok) throw new Error("Bulk edit failed");
+            await customersApi.bulkUpdate({ ids: selectedIds, data: dataToUpdate });
             setShowBulkEdit(false);
             setBulkEditData({ business_category: '', tags: '', exchanger: '', added_at: '' });
             setSelectedIds([]); fetchCustomers();
@@ -97,11 +76,7 @@ const Dashboard = () => {
     const saveInlineEdit = async (id: number) => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/customers/${id}`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...editData })
-            });
-            if (!res.ok) throw new Error("Save failed");
+            await customersApi.update(id, editData);
             setEditingId(null); fetchCustomers();
         } catch (error) {
             console.error("Edit failed", error); alert("編集の保存に失敗しました。"); setLoading(false);
@@ -111,49 +86,8 @@ const Dashboard = () => {
     const handleSort = (key: string) => {
         let direction: 'asc' | 'desc' = 'asc';
         if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-        setSortConfig({ key, direction });
+        setSortConfig({ key: key as keyof Customer, direction });
     };
-
-    // ─── Filtering & Sorting ───────────────────────────────────────
-    const filteredCustomers = useMemo(() => {
-        let result = customers.filter(c =>
-            (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (c.company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (c.email || '').toLowerCase().includes(searchTerm.toLowerCase())
-        );
-
-        Object.keys(filters).forEach(key => {
-            if (filters[key]) {
-                result = result.filter(c => (c[key] || '').toString().toLowerCase().includes(filters[key].toLowerCase()));
-            }
-        });
-
-        if (showDuplicatesOnly) {
-            const dups = new Set<number>();
-            for (let i = 0; i < result.length; i++) {
-                for (let j = i + 1; j < result.length; j++) {
-                    const a = result[i], b = result[j];
-                    const nameMatch = a.name && b.name && a.name === b.name;
-                    const romajiMatch = a.name_romaji && b.name_romaji && a.name_romaji === b.name_romaji;
-                    const companyMatch = a.company && b.company && a.company === b.company;
-                    if ((nameMatch || romajiMatch) && companyMatch) { dups.add(a.id); dups.add(b.id); }
-                }
-            }
-            result = result.filter(c => dups.has(c.id));
-        }
-
-        if (sortConfig) {
-            result.sort((a, b) => {
-                const valA = (a[sortConfig.key] || '').toString().toLowerCase();
-                const valB = (b[sortConfig.key] || '').toString().toLowerCase();
-                if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-                if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-                return 0;
-            });
-        }
-
-        return result;
-    }, [customers, searchTerm, filters, showDuplicatesOnly, sortConfig]);
 
     // ─── Render ─────────────────────────────────────────────────────
     return (
